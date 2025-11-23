@@ -254,6 +254,118 @@ async def consume_items(request: InventoryActionRequest):
         )
 
 
+@router.post("/add-to-shopping-list")
+async def add_to_shopping_list(request: InventoryActionRequest):
+    """
+    Add items to Grocy shopping list
+    
+    This endpoint:
+    1. Creates missing products if requested
+    2. Adds items to the shopping list
+    """
+    config = await get_effective_config()
+    grocy_client = GrocyClient(config["grocy_url"], config["grocy_api_key"])
+    
+    results = {
+        "success": [],
+        "failed": [],
+        "created_products": []
+    }
+    
+    try:
+        # Get existing units for auto-creation
+        existing_units = await grocy_client.get_quantity_units()
+        unit_name_to_id = {u["name"].lower(): u["id"] for u in existing_units}
+        
+        # Get locations for auto-creation
+        locations = await grocy_client.get_locations()
+        location_id = locations[0]["id"] if locations else 1  # Default to first location
+        
+        for item in request.items:
+            try:
+                product_id = item.product_id
+                
+                # Create product if needed
+                if item.create_if_missing and not product_id:
+                    # Get or create unit
+                    unit_lower = item.unit.lower() if item.unit else "unit"
+                    qu_id = unit_name_to_id.get(unit_lower)
+                    
+                    if not qu_id:
+                        # Try to create common units
+                        common_units = {
+                            "g": ("Gram", "Grams"),
+                            "gram": ("Gram", "Grams"),
+                            "kg": ("Kilogram", "Kilograms"),
+                            "kilogram": ("Kilogram", "Kilograms"),
+                            "oz": ("Ounce", "Ounces"),
+                            "ounce": ("Ounce", "Ounces"),
+                            "lb": ("Pound", "Pounds"),
+                            "pound": ("Pound", "Pounds"),
+                            "ml": ("Milliliter", "Milliliters"),
+                            "l": ("Liter", "Liters"),
+                            "liter": ("Liter", "Liters"),
+                            "fl oz": ("Fluid Ounce", "Fluid Ounces"),
+                            "pt": ("Pint", "Pints"),
+                            "qt": ("Quart", "Quarts"),
+                            "gal": ("Gallon", "Gallons"),
+                        }
+                        
+                        if unit_lower in common_units:
+                            name, plural = common_units[unit_lower]
+                            created_unit = await grocy_client.create_quantity_unit(name, plural, unit_lower)
+                            qu_id = created_unit["created_object_id"]
+                            unit_name_to_id[unit_lower] = qu_id
+                        else:
+                            qu_id = unit_name_to_id.get("unit", 1)
+                    
+                    # Create product
+                    created_product = await grocy_client.create_product(
+                        name=item.product_name,
+                        location_id=item.location_id or location_id,
+                        qu_id_stock=qu_id
+                    )
+                    product_id = created_product["created_object_id"]
+                    results["created_products"].append({
+                        "name": item.product_name,
+                        "id": product_id
+                    })
+                
+                if not product_id:
+                    results["failed"].append({
+                        "item": item.product_name,
+                        "reason": "No product ID and creation not enabled"
+                    })
+                    continue
+                
+                # Add to shopping list
+                await grocy_client.add_to_shopping_list(
+                    product_id=product_id,
+                    amount=item.amount,
+                    shopping_list_id=1  # Default shopping list
+                )
+                
+                results["success"].append({
+                    "item": item.product_name,
+                    "amount": item.amount,
+                    "unit": item.unit
+                })
+                
+            except Exception as e:
+                results["failed"].append({
+                    "item": item.product_name if hasattr(item, 'product_name') else "Unknown",
+                    "reason": str(e)
+                })
+        
+        return results
+        
+    except Exception as e:
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=f"Error adding to shopping list: {str(e)}"
+        )
+
+
 @router.post("/create-products")
 async def create_products(products: List[ProductCreateRequest]):
     """

@@ -136,6 +136,11 @@ export const createProducts = async (products) => {
   return response.data;
 };
 
+export const addItemsToShoppingList = async (items) => {
+  const response = await api.post('/api/inventory/add-to-shopping-list', { items });
+  return response.data;
+};
+
 // Recipe Integration APIs (v1.1)
 export const consumeRecipeIngredients = async (recipeId) => {
   const response = await api.post(`/api/recipes/${recipeId}/consume-ingredients`);

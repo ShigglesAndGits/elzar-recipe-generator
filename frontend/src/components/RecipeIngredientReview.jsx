@@ -1,7 +1,8 @@
 import React, { useState, useEffect } from 'react';
 import { 
   purchaseItems, 
-  consumeItems
+  consumeItems,
+  addItemsToShoppingList
 } from '../api';
 
 function RecipeIngredientReview({ 
@@ -74,12 +75,13 @@ function RecipeIngredientReview({
           insufficient_stock: []
         };
       } else if (actionType === 'shopping') {
-        const rawResult = await purchaseItems({ items: transactionItems });
+        const rawResult = await addItemsToShoppingList(transactionItems);
         // Transform to match GrocyActionModal expected format
         result = {
           added: rawResult.success || [],
           already_in_stock: [],
-          skipped: rawResult.failed || []
+          skipped: rawResult.failed || [],
+          created_products: rawResult.created_products || []
         };
       } else {
         // save

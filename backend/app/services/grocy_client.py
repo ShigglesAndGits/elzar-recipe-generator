@@ -213,6 +213,8 @@ class GrocyClient:
         if location_id is not None:
             body["location_id"] = location_id
         
+        print(f"🔍 Consuming product {product_id}: amount={amount}, location_id={location_id}")
+        
         async with httpx.AsyncClient() as client:
             response = await client.post(
                 f"{self.base_url}/api/stock/products/{product_id}/consume",
@@ -226,9 +228,10 @@ class GrocyClient:
                 try:
                     error_data = response.json()
                     error_msg = error_data.get('error_message', response.text)
-                    raise Exception(f"Grocy API error: {response.status_code} - {error_msg}")
                 except:
-                    response.raise_for_status()
+                    error_msg = response.text or "Unknown error"
+                
+                raise Exception(f"Grocy API error: {response.status_code} - {error_msg}")
             
             return response.json()
     

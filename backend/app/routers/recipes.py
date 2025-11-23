@@ -396,9 +396,9 @@ async def parse_recipe_ingredients(recipe_id: int):
         # Format as ParsedItems (same structure as inventory parser)
         from ..models import ParsedItem
         
-        product_name_to_id = {p["name"].lower(): p["id"] for p in products}
-        location_name_to_id = {loc["name"].lower(): loc["id"] for loc in locations}
-        unit_name_to_id = {unit["name"].lower(): unit["id"] for unit in quantity_units}
+        product_name_to_id = {p["name"].lower(): p["id"] for p in products if p.get("name")}
+        location_name_to_id = {loc["name"].lower(): loc["id"] for loc in locations if loc.get("name")}
+        unit_name_to_id = {unit["name"].lower(): unit["id"] for unit in quantity_units if unit.get("name")}
         
         parsed_items = []
         for ing in ingredients:
@@ -425,8 +425,8 @@ async def parse_recipe_ingredients(recipe_id: int):
                 location_id = locations[0]["id"]
             
             # Get unit ID
-            unit_str = ing.get("unit", "").lower()
-            quantity_unit_id = unit_name_to_id.get(unit_str, 2)  # Default to Piece
+            unit_str = (ing.get("unit") or "").lower()
+            quantity_unit_id = unit_name_to_id.get(unit_str, 2) if unit_str else 2  # Default to Piece
             
             parsed_items.append(ParsedItem(
                 original_text=ing.get("ingredient_text", ""),

@@ -23,9 +23,11 @@ function RecipeIngredientReview({
       setItems(parsedItems.map(item => ({
         ...item,
         selected: true, // Auto-select all items
-        // For shopping list, default to creating missing products
-        // For other actions, only create if marked as 'new'
-        create_if_missing: actionType === 'shopping' ? !item.grocy_product_id : item.confidence === 'new'
+        // For shopping list and save, default to creating missing products
+        // For consume, only create if marked as 'new'
+        create_if_missing: (actionType === 'shopping' || actionType === 'save') 
+          ? !item.grocy_product_id 
+          : item.confidence === 'new'
       })));
     }
   }, [parsedItems]);

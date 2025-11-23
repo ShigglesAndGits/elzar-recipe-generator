@@ -66,12 +66,31 @@ function RecipeIngredientReview({
 
       let result;
       if (actionType === 'consume') {
-        result = await consumeItems({ items: transactionItems });
-        setResults({ type: 'consume', data: result });
+        const rawResult = await consumeItems({ items: transactionItems });
+        // Transform to match GrocyActionModal expected format
+        result = {
+          consumed: rawResult.success || [],
+          skipped: rawResult.failed || [],
+          insufficient_stock: []
+        };
+      } else if (actionType === 'shopping') {
+        const rawResult = await purchaseItems({ items: transactionItems });
+        // Transform to match GrocyActionModal expected format
+        result = {
+          added: rawResult.success || [],
+          already_in_stock: [],
+          skipped: rawResult.failed || []
+        };
       } else {
-        // For shopping list and save, use purchase
-        result = await purchaseItems({ items: transactionItems });
-        setResults({ type: actionType, data: result });
+        // save
+        const rawResult = await purchaseItems({ items: transactionItems });
+        result = {
+          recipe_name: "Recipe",
+          servings: 4,
+          grocy_recipe_id: null,
+          ingredients_added: rawResult.success || [],
+          ingredients_skipped: rawResult.failed || []
+        };
       }
 
       if (onComplete) {

@@ -1,8 +1,20 @@
 import axios from 'axios';
 
-// Use relative URL if no VITE_API_URL is set
-// This allows the frontend to work with any hostname/IP/reverse proxy
-const API_BASE_URL = import.meta.env.VITE_API_URL || '';
+// Dynamically determine API URL based on how the frontend is accessed
+// This allows the frontend to work with any hostname/IP
+const getApiBaseUrl = () => {
+  // If VITE_API_URL is set, use it
+  if (import.meta.env.VITE_API_URL) {
+    return import.meta.env.VITE_API_URL;
+  }
+  
+  // Otherwise, use the same host as the frontend but on port 8001
+  const protocol = window.location.protocol;
+  const hostname = window.location.hostname;
+  return `${protocol}//${hostname}:8001`;
+};
+
+const API_BASE_URL = getApiBaseUrl();
 
 const api = axios.create({
   baseURL: API_BASE_URL,

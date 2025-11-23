@@ -115,11 +115,12 @@ class InventoryItem(BaseModel):
     """Item for inventory transaction"""
     product_id: Optional[int] = None
     product_name: str
-    quantity: float
+    amount: float  # Using 'amount' to match Grocy API and frontend
     unit: str
     action: str  # "purchase", "consume", "skip"
     create_if_missing: bool = False
     location_id: Optional[int] = None
+    quantity_unit_id: Optional[int] = None
     best_before_date: Optional[str] = None
     price: Optional[float] = None
 

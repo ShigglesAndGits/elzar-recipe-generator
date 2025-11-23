@@ -162,7 +162,7 @@ async def purchase_items(request: InventoryActionRequest):
                 if item.product_id:
                     await grocy_client.purchase_product(
                         product_id=item.product_id,
-                        amount=item.quantity,
+                        amount=item.amount,
                         best_before_date=item.best_before_date,
                         price=item.price,
                         location_id=item.location_id
@@ -171,7 +171,7 @@ async def purchase_items(request: InventoryActionRequest):
                     results["success"].append({
                         "product_id": item.product_id,
                         "product_name": item.product_name,
-                        "quantity": item.quantity,
+                        "quantity": item.amount,
                         "unit": item.unit
                     })
                 else:
@@ -222,7 +222,7 @@ async def consume_items(request: InventoryActionRequest):
                 if item.product_id:
                     await grocy_client.consume_product(
                         product_id=item.product_id,
-                        amount=item.quantity,
+                        amount=item.amount,
                         spoiled=False,
                         location_id=item.location_id
                     )
@@ -230,7 +230,7 @@ async def consume_items(request: InventoryActionRequest):
                     results["success"].append({
                         "product_id": item.product_id,
                         "product_name": item.product_name,
-                        "quantity": item.quantity,
+                        "quantity": item.amount,
                         "unit": item.unit
                     })
                 else:

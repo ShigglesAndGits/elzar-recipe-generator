@@ -220,7 +220,16 @@ class GrocyClient:
                 json=body,
                 timeout=30.0
             )
-            response.raise_for_status()
+            
+            if response.status_code != 200:
+                # Try to get error details from Grocy
+                try:
+                    error_data = response.json()
+                    error_msg = error_data.get('error_message', response.text)
+                    raise Exception(f"Grocy API error: {response.status_code} - {error_msg}")
+                except:
+                    response.raise_for_status()
+            
             return response.json()
     
     async def create_product(

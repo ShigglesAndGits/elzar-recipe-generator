@@ -69,7 +69,7 @@ function RecipeIngredientReview({
 
       let result;
       if (actionType === 'consume') {
-        const rawResult = await consumeItems({ items: transactionItems });
+        const rawResult = await consumeItems(transactionItems);
         // Transform to match GrocyActionModal expected format
         result = {
           consumed: rawResult.success || [],
@@ -87,7 +87,7 @@ function RecipeIngredientReview({
         };
       } else {
         // save
-        const rawResult = await purchaseItems({ items: transactionItems });
+        const rawResult = await purchaseItems(transactionItems);
         result = {
           recipe_name: "Recipe",
           servings: 4,

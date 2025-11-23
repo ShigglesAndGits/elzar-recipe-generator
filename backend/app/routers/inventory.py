@@ -155,18 +155,36 @@ async def purchase_items(request: InventoryActionRequest):
                         qu_id = 2  # Default to Piece if not a common unit
                     
                     # Create product
-                    created = await grocy_client.create_product(
-                        name=item.product_name,
-                        location_id=item.location_id or 1,  # Default location
-                        qu_id_stock=qu_id,
-                        description=f"Auto-created from inventory import"
-                    )
-                    
-                    item.product_id = created["created_object_id"]
-                    results["created_products"].append({
-                        "name": item.product_name,
-                        "id": item.product_id
-                    })
+                    try:
+                        created = await grocy_client.create_product(
+                            name=item.product_name,
+                            location_id=item.location_id or 1,  # Default location
+                            qu_id_stock=qu_id,
+                            description=f"Auto-created from inventory import"
+                        )
+                        
+                        item.product_id = created["created_object_id"]
+                        results["created_products"].append({
+                            "name": item.product_name,
+                            "id": item.product_id
+                        })
+                    except Exception as product_error:
+                        # Product might already exist, try to find it
+                        if "constraint" in str(product_error).lower() or "unique" in str(product_error).lower():
+                            products = await grocy_client.get_products()
+                            matching_product = next(
+                                (p for p in products if p["name"].lower() == item.product_name.lower()),
+                                None
+                            )
+                            if matching_product:
+                                item.product_id = matching_product["id"]
+                                print(f"ℹ️ Product '{item.product_name}' already exists (ID: {item.product_id})")
+                            else:
+                                print(f"⚠️ Failed to create product '{item.product_name}': {product_error}")
+                                continue
+                        else:
+                            print(f"⚠️ Failed to create product '{item.product_name}': {product_error}")
+                            continue
                 
                 # Purchase the product
                 if item.product_id:
@@ -341,16 +359,32 @@ async def add_to_shopping_list(request: InventoryActionRequest):
                             qu_id = unit_name_to_id.get("unit", 1)
                     
                     # Create product
-                    created_product = await grocy_client.create_product(
-                        name=item.product_name,
-                        location_id=item.location_id or location_id,
-                        qu_id_stock=qu_id
-                    )
-                    product_id = created_product["created_object_id"]
-                    results["created_products"].append({
-                        "name": item.product_name,
-                        "id": product_id
-                    })
+                    try:
+                        created_product = await grocy_client.create_product(
+                            name=item.product_name,
+                            location_id=item.location_id or location_id,
+                            qu_id_stock=qu_id
+                        )
+                        product_id = created_product["created_object_id"]
+                        results["created_products"].append({
+                            "name": item.product_name,
+                            "id": product_id
+                        })
+                    except Exception as product_error:
+                        # Product might already exist, try to find it
+                        if "constraint" in str(product_error).lower() or "unique" in str(product_error).lower():
+                            products = await grocy_client.get_products()
+                            matching_product = next(
+                                (p for p in products if p["name"].lower() == item.product_name.lower()),
+                                None
+                            )
+                            if matching_product:
+                                product_id = matching_product["id"]
+                                print(f"ℹ️ Product '{item.product_name}' already exists (ID: {product_id})")
+                            else:
+                                raise product_error
+                        else:
+                            raise product_error
                 
                 if not product_id:
                     results["failed"].append({

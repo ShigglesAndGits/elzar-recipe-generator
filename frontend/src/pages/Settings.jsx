@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { getConfig, updateConfig, testGrocyConnection, testLLMConnection } from '../api';
+import { getConfig, updateConfig, testGrocyConnection, testLLMConnection, setupUnitConversions } from '../api';
 
 function Settings() {
   const [config, setConfig] = useState(null);
@@ -16,6 +16,9 @@ function Settings() {
   const [llmTestResult, setLlmTestResult] = useState(null);
   const [testingGrocy, setTestingGrocy] = useState(false);
   const [testingLLM, setTestingLLM] = useState(false);
+  
+  // Unit conversion setup
+  const [settingUpUnits, setSettingUpUnits] = useState(false);
 
   useEffect(() => {
     loadConfig();
@@ -100,6 +103,44 @@ function Settings() {
   const handleCancelEdit = () => {
     setEditMode(false);
     setEditForm({});
+  };
+
+  const handleSetupUnitConversions = async (system) => {
+    if (!confirm(`This will create common ${system} units and conversions in Grocy. Continue?`)) {
+      return;
+    }
+
+    setSettingUpUnits(true);
+    try {
+      const result = await setupUnitConversions(system);
+      
+      let message = `✅ ${system.toUpperCase()} Unit Setup Complete!\n\n`;
+      message += `📊 Summary:\n`;
+      message += `• Units created: ${result.summary.units_created}\n`;
+      message += `• Units already existing: ${result.summary.units_existing}\n`;
+      message += `• Conversions created: ${result.summary.conversions_created}\n`;
+      
+      if (result.summary.conversions_failed > 0) {
+        message += `• Conversions failed: ${result.summary.conversions_failed}\n`;
+      }
+      
+      message += `\n📝 Details:\n`;
+      if (result.details.units_created.length > 0) {
+        message += `\nNew units: ${result.details.units_created.join(', ')}`;
+      }
+      if (result.details.conversions_created.length > 0) {
+        message += `\n\nConversions:\n${result.details.conversions_created.slice(0, 5).join('\n')}`;
+        if (result.details.conversions_created.length > 5) {
+          message += `\n... and ${result.details.conversions_created.length - 5} more`;
+        }
+      }
+      
+      alert(message);
+    } catch (err) {
+      alert(err.response?.data?.detail || 'Failed to setup unit conversions');
+    } finally {
+      setSettingUpUnits(false);
+    }
   };
 
   const handleSaveConfig = async () => {
@@ -454,6 +495,82 @@ function Settings() {
               </p>
             </div>
           </div>
+        </div>
+      </div>
+
+      {/* Grocy Unit Conversions Setup */}
+      <div className="bg-gray-800 rounded-lg p-6 shadow-lg">
+        <h2 className="text-2xl font-bold mb-4">Grocy Unit Conversions</h2>
+        
+        <p className="text-gray-300 mb-4">
+          Set up common unit conversions in Grocy for automatic quantity conversion.
+          This enables Grocy to convert between units like kg ↔ g, gallons ↔ cups, etc.
+        </p>
+
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+          {/* Metric Setup */}
+          <div className="bg-gray-700 rounded-lg p-4">
+            <h3 className="font-semibold mb-2 flex items-center">
+              <span className="text-2xl mr-2">📏</span>
+              Metric System
+            </h3>
+            <p className="text-sm text-gray-400 mb-3">
+              Sets up: kg, g, l, ml, tsp, tbsp, cup
+            </p>
+            <button
+              onClick={() => handleSetupUnitConversions('metric')}
+              disabled={settingUpUnits}
+              className="w-full bg-blue-600 hover:bg-blue-700 disabled:bg-gray-600 text-white font-semibold px-4 py-2 rounded-lg transition-colors"
+            >
+              {settingUpUnits ? 'Setting up...' : 'Setup Metric Conversions'}
+            </button>
+            <div className="mt-2 text-xs text-gray-400">
+              <p>Conversions:</p>
+              <ul className="list-disc list-inside ml-2 mt-1">
+                <li>1 kg = 1000 g</li>
+                <li>1 l = 1000 ml</li>
+                <li>1 cup = 240 ml</li>
+                <li>1 tbsp = 15 ml</li>
+                <li>1 tsp = 5 ml</li>
+              </ul>
+            </div>
+          </div>
+
+          {/* Imperial Setup */}
+          <div className="bg-gray-700 rounded-lg p-4">
+            <h3 className="font-semibold mb-2 flex items-center">
+              <span className="text-2xl mr-2">📐</span>
+              Imperial System
+            </h3>
+            <p className="text-sm text-gray-400 mb-3">
+              Sets up: lb, oz, gal, qt, pt, cup, fl oz, tbsp, tsp
+            </p>
+            <button
+              onClick={() => handleSetupUnitConversions('imperial')}
+              disabled={settingUpUnits}
+              className="w-full bg-orange-600 hover:bg-orange-700 disabled:bg-gray-600 text-white font-semibold px-4 py-2 rounded-lg transition-colors"
+            >
+              {settingUpUnits ? 'Setting up...' : 'Setup Imperial Conversions'}
+            </button>
+            <div className="mt-2 text-xs text-gray-400">
+              <p>Conversions:</p>
+              <ul className="list-disc list-inside ml-2 mt-1">
+                <li>1 lb = 16 oz</li>
+                <li>1 gal = 4 qt</li>
+                <li>1 qt = 2 pt</li>
+                <li>1 pt = 2 cups</li>
+                <li>1 cup = 8 fl oz</li>
+                <li>1 tbsp = 3 tsp</li>
+              </ul>
+            </div>
+          </div>
+        </div>
+
+        <div className="mt-4 bg-blue-900 border border-blue-700 rounded p-3 text-blue-200">
+          <p className="text-sm">
+            💡 <strong>Tip:</strong> These buttons will create units and conversions in Grocy. 
+            Existing units won't be duplicated. You can run both metric and imperial if needed!
+          </p>
         </div>
       </div>
 

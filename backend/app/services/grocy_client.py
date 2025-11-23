@@ -319,6 +319,44 @@ class GrocyClient:
                 print(f"❌ Failed to create quantity unit '{name}': {error_detail}")
                 raise Exception(error_detail)
     
+    async def create_quantity_unit_conversion(
+        self,
+        from_qu_id: int,
+        to_qu_id: int,
+        factor: float
+    ) -> Dict[str, Any]:
+        """
+        Create a quantity unit conversion in Grocy
+        
+        Args:
+            from_qu_id: Source quantity unit ID
+            to_qu_id: Target quantity unit ID
+            factor: Conversion factor (from * factor = to)
+        
+        Returns:
+            Created conversion details
+        """
+        body = {
+            "from_qu_id": from_qu_id,
+            "to_qu_id": to_qu_id,
+            "factor": factor
+        }
+        
+        async with httpx.AsyncClient() as client:
+            try:
+                response = await client.post(
+                    f"{self.base_url}/api/objects/quantity_unit_conversions",
+                    headers=self.headers,
+                    json=body,
+                    timeout=30.0
+                )
+                response.raise_for_status()
+                return response.json()
+            except httpx.HTTPStatusError as e:
+                error_detail = f"Grocy API error: {e.response.status_code} - {e.response.text}"
+                print(f"❌ Failed to create unit conversion: {error_detail}")
+                raise Exception(error_detail)
+    
     async def add_to_shopping_list(
         self, 
         product_id: int, 

@@ -157,4 +157,9 @@ export const parseRecipeIngredients = async (recipeId, actionType = 'consume') =
   return response.data;
 };
 
+export const setupUnitConversions = async (system) => {
+  const response = await api.post(`/api/settings/setup-unit-conversions/${system}`);
+  return response.data;
+};
+
 export default api;

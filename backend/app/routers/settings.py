@@ -179,6 +179,136 @@ async def test_grocy_connection():
         )
 
 
+@router.post("/setup-unit-conversions/{system}")
+async def setup_unit_conversions(system: str):
+    """
+    Set up common unit conversions in Grocy
+    
+    Args:
+        system: 'metric' or 'imperial'
+    
+    Returns:
+        Summary of units and conversions created
+    """
+    if system not in ["metric", "imperial"]:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="System must be 'metric' or 'imperial'"
+        )
+    
+    config = await get_effective_config()
+    grocy_client = GrocyClient(config["grocy_url"], config["grocy_api_key"])
+    
+    results = {
+        "units_created": [],
+        "units_existing": [],
+        "conversions_created": [],
+        "conversions_failed": []
+    }
+    
+    try:
+        # Get existing units
+        existing_units = await grocy_client.get_quantity_units()
+        existing_unit_names = {u["name"].lower(): u["id"] for u in existing_units}
+        
+        # Define common units and conversions
+        if system == "metric":
+            units_to_create = [
+                ("Gram", "Grams", "g"),
+                ("Kilogram", "Kilograms", "kg"),
+                ("Milliliter", "Milliliters", "ml"),
+                ("Liter", "Liters", "l"),
+                ("Teaspoon", "Teaspoons", "tsp"),
+                ("Tablespoon", "Tablespoons", "tbsp"),
+                ("Cup", "Cups", "cup")
+            ]
+            
+            conversions = [
+                # Weight
+                ("Kilogram", "Gram", 1000),
+                # Volume
+                ("Liter", "Milliliter", 1000),
+                ("Cup", "Milliliter", 240),
+                ("Tablespoon", "Milliliter", 15),
+                ("Teaspoon", "Milliliter", 5),
+            ]
+        else:  # imperial
+            units_to_create = [
+                ("Ounce", "Ounces", "oz"),
+                ("Pound", "Pounds", "lb"),
+                ("Fluid Ounce", "Fluid Ounces", "fl oz"),
+                ("Cup", "Cups", "cup"),
+                ("Pint", "Pints", "pt"),
+                ("Quart", "Quarts", "qt"),
+                ("Gallon", "Gallons", "gal"),
+                ("Teaspoon", "Teaspoons", "tsp"),
+                ("Tablespoon", "Tablespoons", "tbsp")
+            ]
+            
+            conversions = [
+                # Weight
+                ("Pound", "Ounce", 16),
+                # Volume
+                ("Gallon", "Quart", 4),
+                ("Quart", "Pint", 2),
+                ("Pint", "Cup", 2),
+                ("Cup", "Fluid Ounce", 8),
+                ("Fluid Ounce", "Tablespoon", 2),
+                ("Tablespoon", "Teaspoon", 3),
+            ]
+        
+        # Create units
+        unit_id_map = {}
+        for name, plural, description in units_to_create:
+            if name.lower() in existing_unit_names:
+                unit_id_map[name] = existing_unit_names[name.lower()]
+                results["units_existing"].append(name)
+            else:
+                try:
+                    created = await grocy_client.create_quantity_unit(
+                        name=name,
+                        name_plural=plural,
+                        description=description
+                    )
+                    unit_id = created.get("created_object_id")
+                    unit_id_map[name] = unit_id
+                    results["units_created"].append(name)
+                except Exception as e:
+                    print(f"Failed to create unit {name}: {e}")
+                    continue
+        
+        # Create conversions
+        for from_unit, to_unit, factor in conversions:
+            if from_unit in unit_id_map and to_unit in unit_id_map:
+                try:
+                    await grocy_client.create_quantity_unit_conversion(
+                        from_qu_id=unit_id_map[from_unit],
+                        to_qu_id=unit_id_map[to_unit],
+                        factor=factor
+                    )
+                    results["conversions_created"].append(f"{from_unit} → {to_unit} (×{factor})")
+                except Exception as e:
+                    results["conversions_failed"].append(f"{from_unit} → {to_unit}: {str(e)}")
+        
+        return {
+            "status": "success",
+            "system": system,
+            "summary": {
+                "units_created": len(results["units_created"]),
+                "units_existing": len(results["units_existing"]),
+                "conversions_created": len(results["conversions_created"]),
+                "conversions_failed": len(results["conversions_failed"])
+            },
+            "details": results
+        }
+        
+    except Exception as e:
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=f"Failed to setup unit conversions: {str(e)}"
+        )
+
+
 @router.get("/test/llm")
 async def test_llm_connection():
     """Test LLM API connection"""

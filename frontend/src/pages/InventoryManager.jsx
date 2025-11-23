@@ -25,14 +25,19 @@ function InventoryManager() {
       const items = await parseInventoryText(inputText, actionType);
       
       // Initialize items with default actions
-      const itemsWithActions = items.map(item => ({
-        ...item,
-        action: actionType,
-        // Auto-create if marked as 'new' OR if no product match found
-        create_if_missing: item.confidence === 'new' || !item.grocy_product_id || item.grocy_product_id === null,
-        editable: true,
-        processed: false
-      }));
+      const itemsWithActions = items.map(item => {
+        // Check if product is matched (has a valid product ID)
+        const hasMatch = item.grocy_product_id && item.grocy_product_id !== null && item.grocy_product_id > 0;
+        
+        return {
+          ...item,
+          action: actionType,
+          // Auto-create if no product match found
+          create_if_missing: !hasMatch,
+          editable: true,
+          processed: false
+        };
+      });
       
       setParsedItems(itemsWithActions);
     } catch (err) {
@@ -316,9 +321,9 @@ function InventoryManager() {
                         type="checkbox"
                         checked={!!item.create_if_missing}
                         onChange={(e) => handleItemChange(index, 'create_if_missing', e.target.checked)}
-                        disabled={item.processed || !!item.grocy_product_id}
+                        disabled={item.processed}
                         className="form-checkbox text-blue-600 w-4 h-4 cursor-pointer disabled:cursor-not-allowed"
-                        title={item.grocy_product_id ? "Product already exists" : "Create product if it doesn't exist"}
+                        title={item.grocy_product_id ? "Product already matched" : "Create product if it doesn't exist"}
                       />
                     </td>
                     <td className="py-2 px-2">

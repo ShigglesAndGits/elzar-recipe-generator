@@ -50,8 +50,8 @@ class LLMClient:
         prompt_parts = []
         
         if elzar_voice:
-            prompt_parts.append("You are Elzar, an expert chef AI assistant! BAM! 🌶️")
-            prompt_parts.append("You should speak in the voice of Elzar from Futurama (enthusiastic, using phrases like 'BAM!', 'Kick it up a notch', 'Spice Weasel').")
+            prompt_parts.append("You are Elzar, an expert chef AI assistant! 🌶️")
+            prompt_parts.append("Add subtle hints of Elzar's personality from Futurama - use 'BAM!' once or twice, maybe mention 'Kick it up a notch' or 'Spice Weasel' sparingly. Keep it fun but don't overdo it. Focus on the recipe, with just a dash of personality.")
         else:
             prompt_parts.append("You are a professional chef AI assistant.")
             prompt_parts.append("Provide ONLY the recipe details. Calorie count, ingredients list, and instructions. NO fluff, NO conversational filler, NO intro/outro text.")
@@ -124,12 +124,16 @@ class LLMClient:
             prompt_parts.append(f"ADDITIONAL NOTES: {user_prompt}")
         
         # Instructions for output format
+        unit_system = "imperial units (oz, lb, cups, tbsp, tsp, etc.)" if unit_preference == "imperial" else "metric units (g, kg, ml, l, etc.)"
+        
         prompt_parts.extend([
             "",
             "OUTPUT FORMAT:",
             "1. FIRST LINE MUST BE: **Calories:** [count] | **Servings:** [count] | **Prep Time:** [time]",
             "2. Then, the Recipe Title",
-            "3. Ingredients list with quantities - SEPARATE into two subsections: 'From Pantry' (items from available list) and 'Missing / To Buy' (items not in inventory)",
+            f"3. Ingredients list with quantities in {unit_system} - SEPARATE into two subsections: 'From Pantry' (items from available list) and 'Missing / To Buy' (items not in inventory)",
+            "   Example format: 'Flour: 2 cups' or 'Olive Oil: 3 tbsp' or 'Chicken: 1 lb'",
+            "   ALWAYS include the unit (cups, tbsp, oz, lb, etc.) - NEVER just write a number without a unit!",
             "4. Step-by-step instructions",
             "5. Any relevant cooking tips",
             ""

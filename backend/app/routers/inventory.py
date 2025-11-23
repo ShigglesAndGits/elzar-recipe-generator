@@ -407,6 +407,25 @@ async def add_to_shopping_list(request: InventoryActionRequest):
                     })
                     continue
                 
+                # Check current stock before adding to shopping list
+                try:
+                    stock = await grocy_client.get_stock()
+                    product_stock = next((s for s in stock if s["product_id"] == product_id), None)
+                    
+                    if product_stock:
+                        current_amount = float(product_stock.get("amount", 0))
+                        
+                        # If we have enough in stock, skip adding to shopping list
+                        if current_amount >= item.amount:
+                            results["failed"].append({
+                                "item": item.product_name,
+                                "reason": f"Already in stock ({current_amount} {item.unit} available)"
+                            })
+                            continue
+                except Exception as stock_error:
+                    # If we can't check stock, proceed with adding to list
+                    print(f"⚠️ Could not check stock for {item.product_name}: {stock_error}")
+                
                 # Add to shopping list
                 await grocy_client.add_to_shopping_list(
                     product_id=product_id,

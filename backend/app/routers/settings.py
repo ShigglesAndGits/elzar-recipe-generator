@@ -5,6 +5,7 @@ from typing import Dict, Any, Optional
 from ..database import db
 from ..config import settings
 from ..utils.config_manager import get_effective_config
+from ..services.grocy_client import GrocyClient
 
 router = APIRouter(prefix="/api/settings", tags=["settings"])
 

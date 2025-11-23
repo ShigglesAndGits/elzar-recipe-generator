@@ -29,8 +29,9 @@ function InventoryManager() {
         ...item,
         action: actionType,
         // Auto-create if marked as 'new' OR if no product match found
-        create_if_missing: item.confidence === 'new' || !item.grocy_product_id,
-        editable: true
+        create_if_missing: item.confidence === 'new' || !item.grocy_product_id || item.grocy_product_id === null,
+        editable: true,
+        processed: false
       }));
       
       setParsedItems(itemsWithActions);
@@ -313,10 +314,10 @@ function InventoryManager() {
                     <td className="py-2 px-2 text-center">
                       <input
                         type="checkbox"
-                        checked={item.create_if_missing}
+                        checked={!!item.create_if_missing}
                         onChange={(e) => handleItemChange(index, 'create_if_missing', e.target.checked)}
-                        disabled={item.processed || item.grocy_product_id}
-                        className="form-checkbox text-blue-600 w-4 h-4"
+                        disabled={item.processed || !!item.grocy_product_id}
+                        className="form-checkbox text-blue-600 w-4 h-4 cursor-pointer disabled:cursor-not-allowed"
                         title={item.grocy_product_id ? "Product already exists" : "Create product if it doesn't exist"}
                       />
                     </td>

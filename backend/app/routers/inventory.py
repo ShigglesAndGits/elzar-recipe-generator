@@ -54,8 +54,22 @@ async def parse_inventory_text(request: InventoryParseRequest):
             unit_preference
         )
         
-        # Convert to ParsedItem models
-        result = [ParsedItem(**item) for item in parsed_items]
+        # Convert to ParsedItem models with robust None handling
+        result = []
+        for item in parsed_items:
+            # Ensure quantity and unit have valid values
+            parsed_item = ParsedItem(
+                original_text=item.get("original_text", ""),
+                item_name=item.get("item_name", "Unknown"),
+                quantity=float(item.get("quantity") or 1.0),  # Default to 1.0 if None
+                unit=item.get("unit") or "unit",  # Default to "unit" if None
+                grocy_product_id=item.get("matched_product_id"),
+                grocy_product_name=item.get("matched_product_name"),
+                confidence=item.get("confidence", "low"),
+                location_id=item.get("suggested_location_id"),
+                quantity_unit_id=item.get("suggested_quantity_unit_id")
+            )
+            result.append(parsed_item)
         
         return result
         

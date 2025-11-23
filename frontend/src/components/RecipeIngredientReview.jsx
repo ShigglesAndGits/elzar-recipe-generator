@@ -1,9 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { 
   purchaseItems, 
-  consumeItems, 
-  createGrocyProduct,
-  getConfig 
+  consumeItems
 } from '../api';
 
 function RecipeIngredientReview({ 
@@ -18,63 +16,20 @@ function RecipeIngredientReview({
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState(null);
   const [results, setResults] = useState(null);
-  const [grocyLocations, setGrocyLocations] = useState([]);
-  const [grocyUnits, setGrocyUnits] = useState([]);
-
   useEffect(() => {
     if (parsedItems) {
       setItems(parsedItems.map(item => ({
         ...item,
-        selected: item.confidence !== 'new', // Auto-select matched items
-        create_if_missing: item.confidence === 'new'
+        selected: true, // Auto-select all items
+        create_if_missing: item.confidence === 'new' // Flag for backend to create
       })));
     }
   }, [parsedItems]);
 
-  useEffect(() => {
-    const loadGrocyData = async () => {
-      try {
-        const config = await getConfig();
-        // TODO: Add API endpoints to fetch locations and units
-        // For now, we'll work with what we have
-      } catch (err) {
-        console.error("Failed to load Grocy metadata:", err);
-      }
-    };
-    if (isOpen) {
-      loadGrocyData();
-    }
-  }, [isOpen]);
-
-  const handleCreateProduct = async (itemIndex) => {
-    const item = items[itemIndex];
-    if (!item.item_name || !item.location_id || !item.quantity_unit_id) {
-      alert('Cannot create product: missing name, location, or unit.');
-      return;
-    }
-    setLoading(true);
-    try {
-      const newProduct = await createGrocyProduct({
-        name: item.item_name,
-        location_id: item.location_id,
-        quantity_unit_id: item.quantity_unit_id,
-      });
-      const updatedItems = [...items];
-      updatedItems[itemIndex] = {
-        ...item,
-        grocy_product_id: newProduct.product.id,
-        grocy_product_name: newProduct.product.name,
-        confidence: 'high',
-        selected: true
-      };
-      setItems(updatedItems);
-      alert(`Product "${newProduct.product.name}" created in Grocy!`);
-    } catch (err) {
-      setError(err.response?.data?.detail || 'Failed to create product.');
-      console.error('Create product error:', err);
-    } finally {
-      setLoading(false);
-    }
+  const handleToggleCreateIfMissing = (index) => {
+    setItems(prev => prev.map((item, i) =>
+      i === index ? { ...item, create_if_missing: !item.create_if_missing } : item
+    ));
   };
 
   const handleExecuteAction = async () => {
@@ -82,35 +37,34 @@ function RecipeIngredientReview({
     setError(null);
     
     try {
-      const selectedItems = items.filter(item => item.selected && item.grocy_product_id);
+      const selectedItems = items.filter(item => item.selected);
       
       if (selectedItems.length === 0) {
-        alert('No items selected or matched to Grocy products.');
+        alert('No items selected.');
         setLoading(false);
         return;
       }
 
       const transactionItems = selectedItems.map(item => ({
         product_id: item.grocy_product_id,
+        product_name: item.item_name,
         amount: item.quantity,
+        unit: item.unit,
         location_id: item.location_id,
+        quantity_unit_id: item.quantity_unit_id,
         best_before_date: null,
-        action: actionType === 'consume' ? 'consume' : 'purchase'
+        action: actionType === 'consume' ? 'consume' : 'purchase',
+        create_if_missing: item.create_if_missing && !item.grocy_product_id
       }));
 
       let result;
       if (actionType === 'consume') {
         result = await consumeItems({ items: transactionItems });
         setResults({ type: 'consume', data: result });
-      } else if (actionType === 'shopping') {
-        // For shopping list, we use purchase but with a flag
+      } else {
+        // For shopping list and save, use purchase
         result = await purchaseItems({ items: transactionItems });
-        setResults({ type: 'shopping', data: result });
-      } else if (actionType === 'save') {
-        // For save, we'd call a different endpoint
-        // For now, treat it like shopping
-        result = await purchaseItems({ items: transactionItems });
-        setResults({ type: 'save', data: result });
+        setResults({ type: actionType, data: result });
       }
 
       if (onComplete) {
@@ -213,21 +167,29 @@ function RecipeIngredientReview({
                           {item.confidence === 'new' ? 'NEW' : item.confidence.toUpperCase()}
                         </span>
                       </td>
-                      <td className="p-3 text-sm space-x-2">
-                        {item.confidence === 'new' && !item.grocy_product_id && (
-                          <button
-                            onClick={() => handleCreateProduct(index)}
-                            disabled={loading}
-                            className="bg-blue-600 hover:bg-blue-700 text-white px-3 py-1 rounded text-xs transition-colors"
-                          >
-                            Create Product
-                          </button>
+                      <td className="p-3 text-sm">
+                        {item.confidence === 'new' && !item.grocy_product_id ? (
+                          <label className="flex items-center space-x-2">
+                            <input
+                              type="checkbox"
+                              checked={item.create_if_missing}
+                              onChange={() => handleToggleCreateIfMissing(index)}
+                              className="form-checkbox text-blue-600"
+                            />
+                            <span className="text-xs">Auto-create</span>
+                          </label>
+                        ) : (
+                          <span className="text-xs text-gray-500">-</span>
                         )}
                       </td>
                     </tr>
                   ))}
                 </tbody>
               </table>
+
+              <div className="mt-4 text-sm text-gray-400">
+                <p>💡 <strong>Tip:</strong> Items marked "NEW" will be automatically created in Grocy if "Auto-create" is checked.</p>
+              </div>
             </div>
           ) : (
             <div className="bg-gray-700 rounded-lg p-4">

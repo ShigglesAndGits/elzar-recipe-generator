@@ -18,6 +18,7 @@ class Settings(BaseSettings):
     max_recipe_history: int = 1000
     database_path: str = "../data/recipes.db"
     recipe_export_path: str = "../data/recipes"
+    unit_preference: str = "metric"  # "metric" or "imperial"
     
     # Notification
     apprise_url: Optional[str] = None

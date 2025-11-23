@@ -131,13 +131,8 @@ BACKEND_PORT={config.get('backend_port', 8000)}
 UNIT_PREFERENCE={config.get('unit_preference', 'metric')}
 """
         
-        print(f"🔧 Writing config to: {env_path}")
-        print(f"📝 Config content preview: GROCY_API_KEY={'[SET]' if config['grocy_api_key'] else '[EMPTY]'}, UNIT_PREFERENCE={config.get('unit_preference', 'metric')}")
-        
         with open(env_path, 'w') as f:
             f.write(env_content)
-        
-        print(f"✅ Config written successfully to {env_path}")
         
         return {
             "status": "success", 

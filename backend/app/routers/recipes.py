@@ -690,6 +690,11 @@ async def save_recipe_to_grocy(recipe_id: int):
     
     # Initialize clients
     grocy_client = GrocyClient(config["grocy_url"], config["grocy_api_key"])
+    llm_client = LLMClient(
+        config["llm_api_url"],
+        config["llm_api_key"],
+        config["llm_model"]
+    )
     matcher = InventoryMatcher(
         config["llm_api_url"],
         config["llm_api_key"],
@@ -697,6 +702,9 @@ async def save_recipe_to_grocy(recipe_id: int):
     )
     
     try:
+        # Format recipe for Grocy (strip Elzar's voice, clean formatting)
+        formatted_recipe = await llm_client.format_recipe_for_grocy(recipe["recipe_text"])
+        
         # Get Grocy data
         products = await grocy_client.get_products()
         stock_info = await grocy_client.format_inventory_for_llm()
@@ -713,7 +721,7 @@ async def save_recipe_to_grocy(recipe_id: int):
             "l": unit_lookup.get("liter", unit_lookup.get("l", 1)),
         })
         
-        # Extract and match ingredients
+        # Extract and match ingredients (use original recipe for LLM parsing)
         ingredients = await matcher.extract_recipe_ingredients(
             recipe["recipe_text"],
             products,
@@ -721,11 +729,11 @@ async def save_recipe_to_grocy(recipe_id: int):
             unit_preference
         )
         
-        # Extract recipe title from text (first line, remove markdown #)
-        recipe_lines = recipe["recipe_text"].split("\n")
+        # Extract recipe title from formatted text (first line, remove markdown #)
+        recipe_lines = formatted_recipe.split("\n")
         recipe_title = recipe_lines[0].replace("#", "").strip() if recipe_lines else "Elzar Recipe"
         
-        # Infer servings from recipe text or use default
+        # Infer servings from formatted recipe text or use default
         servings = 4  # Default
         for line in recipe_lines[:10]:  # Check first 10 lines
             if "serving" in line.lower():
@@ -736,10 +744,10 @@ async def save_recipe_to_grocy(recipe_id: int):
                     servings = int(numbers[0])
                     break
         
-        # Create recipe in Grocy
+        # Create recipe in Grocy with formatted text
         created_recipe = await grocy_client.create_recipe(
             name=recipe_title,
-            description=recipe["recipe_text"],
+            description=formatted_recipe,  # Use formatted version
             base_servings=servings
         )
         

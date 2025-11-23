@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import ReactMarkdown from 'react-markdown';
+import GrocyActionModal from '../components/GrocyActionModal';
 import { 
   generateRecipe, 
   regenerateRecipe, 
@@ -45,6 +46,12 @@ function Generator() {
   const [currentRecipe, setCurrentRecipe] = useState(null);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState(null);
+
+  // Modal state for Grocy actions
+  const [modalOpen, setModalOpen] = useState(false);
+  const [modalTitle, setModalTitle] = useState('');
+  const [modalResults, setModalResults] = useState(null);
+  const [modalActionType, setModalActionType] = useState(null);
 
   // Load profiles on mount
   useEffect(() => {
@@ -161,15 +168,10 @@ function Generator() {
     try {
       const result = await consumeRecipeIngredients(currentRecipe.id);
       
-      let message = `✓ Consumed ${result.consumed.length} ingredients\n`;
-      if (result.insufficient_stock.length > 0) {
-        message += `⚠ ${result.insufficient_stock.length} items had insufficient stock\n`;
-      }
-      if (result.skipped.length > 0) {
-        message += `⚠ Skipped ${result.skipped.length} items`;
-      }
-      
-      alert(message);
+      setModalTitle('Consume Recipe Ingredients');
+      setModalResults(result);
+      setModalActionType('consume');
+      setModalOpen(true);
     } catch (err) {
       console.error('Consume error:', err);
       alert(err.response?.data?.detail || 'Failed to consume ingredients');
@@ -182,20 +184,10 @@ function Generator() {
     try {
       const result = await addMissingToShoppingList(currentRecipe.id);
       
-      if (result.added.length === 0) {
-        alert('All ingredients are already in stock! 🎉');
-      } else {
-        let message = `✓ Added ${result.added.length} items to shopping list\n\n`;
-        message += result.added.map(item => 
-          `• ${item.product_name}: ${item.quantity} ${item.unit}`
-        ).join('\n');
-        
-        if (result.skipped.length > 0) {
-          message += `\n\n⚠ Skipped ${result.skipped.length} items (no product match)`;
-        }
-        
-        alert(message);
-      }
+      setModalTitle('Add Missing Ingredients to Shopping List');
+      setModalResults(result);
+      setModalActionType('shopping');
+      setModalOpen(true);
     } catch (err) {
       console.error('Shopping list error:', err);
       alert(err.response?.data?.detail || 'Failed to add to shopping list');
@@ -212,16 +204,10 @@ function Generator() {
     try {
       const result = await saveRecipeToGrocy(currentRecipe.id);
       
-      let message = `✓ Recipe saved to Grocy!\n`;
-      message += `Recipe: ${result.recipe_name}\n`;
-      message += `Servings: ${result.servings}\n`;
-      message += `Ingredients: ${result.ingredients_added.length} added`;
-      
-      if (result.ingredients_skipped.length > 0) {
-        message += `\n⚠ ${result.ingredients_skipped.length} ingredients skipped (no match)`;
-      }
-      
-      alert(message);
+      setModalTitle('Save Recipe to Grocy');
+      setModalResults(result);
+      setModalActionType('save');
+      setModalOpen(true);
     } catch (err) {
       console.error('Save recipe error:', err);
       alert(err.response?.data?.detail || 'Failed to save recipe to Grocy');
@@ -534,6 +520,15 @@ function Generator() {
           </div>
         )}
       </div>
+
+      {/* Grocy Action Results Modal */}
+      <GrocyActionModal
+        isOpen={modalOpen}
+        onClose={() => setModalOpen(false)}
+        title={modalTitle}
+        results={modalResults}
+        actionType={modalActionType}
+      />
     </div>
   );
 }

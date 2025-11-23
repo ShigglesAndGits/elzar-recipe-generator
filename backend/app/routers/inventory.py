@@ -63,10 +63,10 @@ async def parse_inventory_text(request: InventoryParseRequest):
                 item_name=item.get("item_name", "Unknown"),
                 quantity=float(item.get("quantity") or 1.0),  # Default to 1.0 if None
                 unit=item.get("unit") or "unit",  # Default to "unit" if None
-                grocy_product_id=item.get("matched_product_id"),
-                grocy_product_name=item.get("matched_product_name"),
+                grocy_product_id=item.get("matched_product_id") or item.get("product_id"),
+                grocy_product_name=item.get("matched_product_name") or item.get("product_name"),
                 confidence=item.get("confidence", "low"),
-                location_id=item.get("suggested_location_id"),
+                location_id=item.get("suggested_location_id") or item.get("location_id"),
                 quantity_unit_id=item.get("suggested_quantity_unit_id")
             )
             result.append(parsed_item)

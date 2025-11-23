@@ -98,11 +98,11 @@ class ParsedItem(BaseModel):
     item_name: str
     quantity: float
     unit: str
-    matched_product_id: Optional[int] = None
-    matched_product_name: Optional[str] = None
+    grocy_product_id: Optional[int] = None
+    grocy_product_name: Optional[str] = None
     confidence: str  # "high", "medium", "low", "new"
-    suggested_location_id: Optional[int] = None
-    suggested_location_name: Optional[str] = None
+    location_id: Optional[int] = None
+    quantity_unit_id: Optional[int] = None
 
 
 class InventoryParseRequest(BaseModel):

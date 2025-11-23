@@ -66,7 +66,7 @@ function InventoryManager() {
         amount: item.quantity,  // Backend expects 'amount', not 'quantity'
         unit: item.unit,
         action: item.action,
-        create_if_missing: item.create_if_missing && item.confidence === 'new',
+        create_if_missing: item.create_if_missing,  // Use the checkbox value directly
         location_id: item.suggested_location_id
       };
 
@@ -106,7 +106,7 @@ function InventoryManager() {
           amount: item.quantity,  // Backend expects 'amount', not 'quantity'
           unit: item.unit,
           action: 'purchase',
-          create_if_missing: item.create_if_missing && item.confidence === 'new',
+          create_if_missing: item.create_if_missing,  // Use the checkbox value directly
           location_id: item.suggested_location_id
         }));
 
@@ -265,6 +265,7 @@ function InventoryManager() {
                   <th className="text-left py-2 px-2">Unit</th>
                   <th className="text-left py-2 px-2">Matched Product</th>
                   <th className="text-left py-2 px-2">Confidence</th>
+                  <th className="text-left py-2 px-2">Auto-create</th>
                   <th className="text-left py-2 px-2">Action</th>
                   <th className="text-left py-2 px-2"></th>
                 </tr>
@@ -308,6 +309,16 @@ function InventoryManager() {
                     </td>
                     <td className="py-2 px-2">
                       {getConfidenceBadge(item.confidence)}
+                    </td>
+                    <td className="py-2 px-2 text-center">
+                      <input
+                        type="checkbox"
+                        checked={item.create_if_missing}
+                        onChange={(e) => handleItemChange(index, 'create_if_missing', e.target.checked)}
+                        disabled={item.processed || item.grocy_product_id}
+                        className="form-checkbox text-blue-600 w-4 h-4"
+                        title={item.grocy_product_id ? "Product already exists" : "Create product if it doesn't exist"}
+                      />
                     </td>
                     <td className="py-2 px-2">
                       <select

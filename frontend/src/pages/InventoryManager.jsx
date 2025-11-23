@@ -28,7 +28,8 @@ function InventoryManager() {
       const itemsWithActions = items.map(item => ({
         ...item,
         action: actionType,
-        create_if_missing: item.confidence === 'new',
+        // Auto-create if marked as 'new' OR if no product match found
+        create_if_missing: item.confidence === 'new' || !item.grocy_product_id,
         editable: true
       }));
       

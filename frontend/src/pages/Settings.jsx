@@ -119,6 +119,7 @@ function Settings() {
       message += `• Units created: ${result.summary.units_created}\n`;
       message += `• Units already existing: ${result.summary.units_existing}\n`;
       message += `• Conversions created: ${result.summary.conversions_created}\n`;
+      message += `• Conversions already existing: ${result.summary.conversions_existing}\n`;
       
       if (result.summary.conversions_failed > 0) {
         message += `• Conversions failed: ${result.summary.conversions_failed}\n`;
@@ -129,9 +130,15 @@ function Settings() {
         message += `\nNew units: ${result.details.units_created.join(', ')}`;
       }
       if (result.details.conversions_created.length > 0) {
-        message += `\n\nConversions (showing first 10):\n${result.details.conversions_created.slice(0, 10).join('\n')}`;
+        message += `\n\n✨ New conversions (showing first 10):\n${result.details.conversions_created.slice(0, 10).join('\n')}`;
         if (result.details.conversions_created.length > 10) {
           message += `\n... and ${result.details.conversions_created.length - 10} more`;
+        }
+      }
+      if (result.details.conversions_existing && result.details.conversions_existing.length > 0) {
+        message += `\n\n✓ Already configured (showing first 5):\n${result.details.conversions_existing.slice(0, 5).join(', ')}`;
+        if (result.details.conversions_existing.length > 5) {
+          message += `\n... and ${result.details.conversions_existing.length - 5} more`;
         }
       }
       

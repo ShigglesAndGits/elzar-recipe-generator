@@ -204,6 +204,7 @@ async def setup_unit_conversions():
         "units_created": [],
         "units_existing": [],
         "conversions_created": [],
+        "conversions_existing": [],
         "conversions_failed": []
     }
     
@@ -334,7 +335,12 @@ async def setup_unit_conversions():
                     )
                     results["conversions_created"].append(f"{from_unit} → {to_unit} (×{factor})")
                 except Exception as e:
-                    results["conversions_failed"].append(f"{from_unit} → {to_unit}: {str(e)}")
+                    error_msg = str(e)
+                    # Check if it's a "already exists" error
+                    if "already exists" in error_msg.lower() or "constraint violation" in error_msg.lower():
+                        results["conversions_existing"].append(f"{from_unit} → {to_unit}")
+                    else:
+                        results["conversions_failed"].append(f"{from_unit} → {to_unit}: {error_msg}")
         
         return {
             "status": "success",
@@ -342,6 +348,7 @@ async def setup_unit_conversions():
                 "units_created": len(results["units_created"]),
                 "units_existing": len(results["units_existing"]),
                 "conversions_created": len(results["conversions_created"]),
+                "conversions_existing": len(results["conversions_existing"]),
                 "conversions_failed": len(results["conversions_failed"])
             },
             "details": results

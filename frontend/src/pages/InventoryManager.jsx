@@ -62,7 +62,7 @@ function InventoryManager() {
       const itemData = {
         product_id: item.matched_product_id,
         product_name: item.item_name,
-        quantity: item.quantity,
+        amount: item.quantity,  // Backend expects 'amount', not 'quantity'
         unit: item.unit,
         action: item.action,
         create_if_missing: item.create_if_missing && item.confidence === 'new',
@@ -102,7 +102,7 @@ function InventoryManager() {
         .map(item => ({
           product_id: item.matched_product_id,
           product_name: item.item_name,
-          quantity: item.quantity,
+          amount: item.quantity,  // Backend expects 'amount', not 'quantity'
           unit: item.unit,
           action: 'purchase',
           create_if_missing: item.create_if_missing && item.confidence === 'new',
@@ -114,7 +114,7 @@ function InventoryManager() {
         .map(item => ({
           product_id: item.matched_product_id,
           product_name: item.item_name,
-          quantity: item.quantity,
+          amount: item.quantity,  // Backend expects 'amount', not 'quantity'
           unit: item.unit,
           action: 'consume',
           create_if_missing: false,
@@ -141,8 +141,11 @@ function InventoryManager() {
       setParsedItems(updated);
 
     } catch (err) {
-      setError(err.response?.data?.detail || 'Failed to process items');
+      const errorMessage = err.response?.data?.detail || err.message || 'Failed to process items';
+      setError(errorMessage);
       console.error('Process all error:', err);
+      // Show alert as well for immediate visibility
+      alert(`Error processing items: ${errorMessage}`);
     } finally {
       setProcessing(false);
     }

@@ -101,11 +101,24 @@ function RecipeIngredientReview({
         onComplete(result);
       }
     } catch (err) {
-      setError(err.response?.data?.detail || `Failed to ${actionType} items.`);
+      // Extract detailed error message
+      let errorMessage = `Failed to ${actionType} items.`;
+      
+      if (err.response?.data?.detail) {
+        errorMessage = err.response.data.detail;
+      } else if (err.message) {
+        errorMessage = err.message;
+      }
+      
+      setError(errorMessage);
       console.error('Action error:', err);
-    } finally {
+      
+      // Don't close the modal on error - let user see the error and retry
       setLoading(false);
+      return; // Exit early, don't call onComplete
     }
+    
+    setLoading(false);
   };
 
   const toggleItemSelection = (index) => {

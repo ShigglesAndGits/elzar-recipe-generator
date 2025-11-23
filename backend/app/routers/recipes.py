@@ -348,10 +348,13 @@ async def send_recipe_notification(recipe_id: int, notification: NotificationReq
 
 
 @router.post("/{recipe_id}/parse-ingredients")
-async def parse_recipe_ingredients(recipe_id: int):
+async def parse_recipe_ingredients(recipe_id: int, action_type: str = "consume"):
     """
     Parse recipe ingredients and match them to Grocy products.
     Returns parsed items for user review before taking action.
+    
+    Args:
+        action_type: 'consume', 'shopping', or 'save' - affects quantity conversion
     
     Similar to inventory parsing, this allows users to:
     - Review matched items
@@ -386,11 +389,14 @@ async def parse_recipe_ingredients(recipe_id: int):
         unit_preference = config.get("unit_preference", "metric")
         
         # Extract and match ingredients using LLM
+        # Use shopping list mode for realistic purchasing quantities
+        for_shopping_list = (action_type == "shopping")
         ingredients = await matcher.extract_recipe_ingredients(
             recipe["recipe_text"],
             products,
             stock_info,
-            unit_preference
+            unit_preference,
+            for_shopping_list=for_shopping_list
         )
         
         # Format as ParsedItems (same structure as inventory parser)

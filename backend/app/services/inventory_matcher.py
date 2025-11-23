@@ -160,6 +160,84 @@ Return ONLY a valid JSON array with NO additional text or explanation:
         except (KeyError, IndexError) as e:
             raise Exception(f"Unexpected LLM response format: {str(e)}")
     
+    def build_shopping_list_extraction_prompt(
+        self,
+        recipe_text: str,
+        grocy_products: List[Dict[str, Any]],
+        stock_info: Dict[str, Any],
+        unit_preference: str = "metric"
+    ) -> str:
+        """
+        Build prompt for extracting ingredients for shopping list with realistic purchasing quantities
+        """
+        # Format products for LLM
+        product_list = "\n".join([
+            f"- ID: {p['id']}, Name: {p['name']}"
+            for p in grocy_products
+        ])
+        
+        # Format stock info
+        stock_list = "\n".join([
+            f"- {item['name']}: {item['amount']} {item['unit']} (Product ID: {item['product_id']})"
+            for item in stock_info.get('available_items', [])
+        ])
+        
+        unit_guidance = (
+            "Use metric purchasing units (kg, l) for quantities."
+            if unit_preference == "metric"
+            else "Use imperial purchasing units (lb, gal, qt) for quantities."
+        )
+        
+        prompt = f"""You are a shopping list assistant. Extract ingredients from this recipe and convert them to REALISTIC PURCHASING QUANTITIES.
+
+RECIPE TEXT:
+{recipe_text}
+
+AVAILABLE GROCY PRODUCTS:
+{product_list}
+
+CURRENT STOCK LEVELS:
+{stock_list}
+
+TASK:
+For each ingredient in the recipe:
+1. Extract ingredient name (normalized to match Grocy products)
+2. **CONVERT to realistic purchasing quantity**:
+   - Example: "2 tablespoons olive oil" → 1 bottle (750ml or 25 fl oz)
+   - Example: "1 teaspoon salt" → 1 container (500g or 1 lb)
+   - Example: "1/2 cup flour" → 1 bag (1kg or 2 lb)
+   - Example: "1 cup milk" → 1 carton (1l or 1 qt)
+   - **NEVER use teaspoons, tablespoons, or cups as purchasing units**
+   - Think: "What would I actually buy at the store?"
+3. Use realistic purchasing units. {unit_guidance}
+4. Match to EXISTING Grocy product whenever possible
+5. Check if in stock and if quantity is sufficient
+6. Assign confidence (high/medium/low/new)
+
+**PURCHASING UNIT GUIDELINES:**
+- Spices/seasonings: 1 container (100g or 4 oz minimum)
+- Oils: 1 bottle (500ml-1l or 16-32 fl oz)
+- Flour/sugar: 1 bag (1-2 kg or 2-5 lb)
+- Milk/liquids: 1 carton/bottle (1l or 1 qt minimum)
+- Cheese: 1 package (200-500g or 8-16 oz)
+- Produce: 1 unit or 1 bunch
+
+Return ONLY a valid JSON array with NO additional text:
+[
+  {{
+    "ingredient_text": "2 tablespoons olive oil",
+    "product_id": 12,
+    "product_name": "Olive Oil",
+    "quantity": 750,
+    "unit": "ml",
+    "confidence": "high",
+    "in_stock": false,
+    "stock_amount": 0
+  }}
+]"""
+        
+        return prompt
+    
     def build_recipe_extraction_prompt(
         self,
         recipe_text: str,
@@ -236,20 +314,32 @@ Return ONLY a valid JSON array with NO additional text:
         recipe_text: str,
         grocy_products: List[Dict[str, Any]],
         stock_info: Dict[str, Any],
-        unit_preference: str = "metric"
+        unit_preference: str = "metric",
+        for_shopping_list: bool = False
     ) -> List[Dict[str, Any]]:
         """
         Extract ingredients from recipe text and match to Grocy products
         
+        Args:
+            for_shopping_list: If True, converts to realistic purchasing quantities
+        
         Returns:
             List of recipe ingredients with matching and stock information
         """
-        prompt = self.build_recipe_extraction_prompt(
-            recipe_text,
-            grocy_products,
-            stock_info,
-            unit_preference
-        )
+        if for_shopping_list:
+            prompt = self.build_shopping_list_extraction_prompt(
+                recipe_text,
+                grocy_products,
+                stock_info,
+                unit_preference
+            )
+        else:
+            prompt = self.build_recipe_extraction_prompt(
+                recipe_text,
+                grocy_products,
+                stock_info,
+                unit_preference
+            )
         
         payload = {
             "model": self.llm_model,

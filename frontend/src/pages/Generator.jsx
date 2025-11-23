@@ -170,7 +170,7 @@ function Generator() {
 
     try {
       // Parse ingredients first
-      const parsed = await parseRecipeIngredients(currentRecipe.id);
+      const parsed = await parseRecipeIngredients(currentRecipe.id, 'consume');
       
       // Show review modal
       setReviewParsedItems(parsed.parsed_items);
@@ -186,8 +186,8 @@ function Generator() {
     if (!currentRecipe) return;
 
     try {
-      // Parse ingredients first
-      const parsed = await parseRecipeIngredients(currentRecipe.id);
+      // Parse ingredients first - use shopping mode for realistic quantities
+      const parsed = await parseRecipeIngredients(currentRecipe.id, 'shopping');
       
       // Show review modal
       setReviewParsedItems(parsed.parsed_items);
@@ -204,7 +204,7 @@ function Generator() {
 
     try {
       // Parse ingredients first
-      const parsed = await parseRecipeIngredients(currentRecipe.id);
+      const parsed = await parseRecipeIngredients(currentRecipe.id, 'save');
       
       // Show review modal
       setReviewParsedItems(parsed.parsed_items);

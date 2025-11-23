@@ -42,20 +42,63 @@ const CUISINES = [
   'Vietnamese',
 ];
 
+const KITCHEN_EQUIPMENT = [
+  'Oven',
+  'Stovetop',
+  'Microwave',
+  'Air Fryer',
+  'Instant Pot',
+  'Slow Cooker',
+  'Electric Kettle',
+  'Grill',
+  'Toaster Oven',
+  'Sous Vide',
+  'Blender',
+  'Food Processor',
+];
+
+// Cookie helpers
+const saveToCookie = (key, value) => {
+  try {
+    document.cookie = `elzar_${key}=${encodeURIComponent(JSON.stringify(value))}; path=/; max-age=31536000`; // 1 year
+  } catch (e) {
+    console.error('Failed to save cookie:', e);
+  }
+};
+
+const loadFromCookie = (key, defaultValue) => {
+  try {
+    const name = `elzar_${key}=`;
+    const decodedCookie = decodeURIComponent(document.cookie);
+    const cookies = decodedCookie.split(';');
+    for (let cookie of cookies) {
+      cookie = cookie.trim();
+      if (cookie.indexOf(name) === 0) {
+        return JSON.parse(cookie.substring(name.length));
+      }
+    }
+  } catch (e) {
+    console.error('Failed to load cookie:', e);
+  }
+  return defaultValue;
+};
+
 function Generator() {
-  // Form state
-  const [cuisine, setCuisine] = useState('No Preference');
+  // Form state with cookie persistence
+  const [cuisine, setCuisine] = useState(() => loadFromCookie('cuisine', 'No Preference'));
   const [profiles, setProfiles] = useState([]);
-  const [activeProfiles, setActiveProfiles] = useState([]);
-  const [prioritizeExpiring, setPrioritizeExpiring] = useState(false);
-  const [timeMinutes, setTimeMinutes] = useState(60);
-  const [effortLevel, setEffortLevel] = useState('Medium');
-  const [dishPreference, setDishPreference] = useState("I don't care");
-  const [caloriesPerServing, setCaloriesPerServing] = useState('');
-  const [useExternalIngredients, setUseExternalIngredients] = useState(false);
-  const [elzarVoice, setElzarVoice] = useState(true);
-  const [servings, setServings] = useState('3-4');
-  const [highLeftoverPotential, setHighLeftoverPotential] = useState(false);
+  const [activeProfiles, setActiveProfiles] = useState(() => loadFromCookie('activeProfiles', []));
+  const [prioritizeExpiring, setPrioritizeExpiring] = useState(() => loadFromCookie('prioritizeExpiring', false));
+  const [timeMinutes, setTimeMinutes] = useState(() => loadFromCookie('timeMinutes', 60));
+  const [effortLevel, setEffortLevel] = useState(() => loadFromCookie('effortLevel', 'Medium'));
+  const [dishPreference, setDishPreference] = useState(() => loadFromCookie('dishPreference', "I don't care"));
+  const [caloriesPerServing, setCaloriesPerServing] = useState(() => loadFromCookie('caloriesPerServing', ''));
+  const [useExternalIngredients, setUseExternalIngredients] = useState(() => loadFromCookie('useExternalIngredients', false));
+  const [elzarVoice, setElzarVoice] = useState(() => loadFromCookie('elzarVoice', false)); // OFF by default
+  const [servings, setServings] = useState(() => loadFromCookie('servings', '3-4'));
+  const [highLeftoverPotential, setHighLeftoverPotential] = useState(() => loadFromCookie('highLeftoverPotential', false));
+  const [availableEquipment, setAvailableEquipment] = useState(() => loadFromCookie('availableEquipment', KITCHEN_EQUIPMENT)); // All checked by default
+  const [equipmentExpanded, setEquipmentExpanded] = useState(false);
   const [userPrompt, setUserPrompt] = useState('');
 
   // Recipe state
@@ -79,6 +122,20 @@ function Generator() {
     loadProfiles();
   }, []);
 
+  // Save settings to cookies when they change
+  useEffect(() => { saveToCookie('cuisine', cuisine); }, [cuisine]);
+  useEffect(() => { saveToCookie('activeProfiles', activeProfiles); }, [activeProfiles]);
+  useEffect(() => { saveToCookie('prioritizeExpiring', prioritizeExpiring); }, [prioritizeExpiring]);
+  useEffect(() => { saveToCookie('timeMinutes', timeMinutes); }, [timeMinutes]);
+  useEffect(() => { saveToCookie('effortLevel', effortLevel); }, [effortLevel]);
+  useEffect(() => { saveToCookie('dishPreference', dishPreference); }, [dishPreference]);
+  useEffect(() => { saveToCookie('caloriesPerServing', caloriesPerServing); }, [caloriesPerServing]);
+  useEffect(() => { saveToCookie('useExternalIngredients', useExternalIngredients); }, [useExternalIngredients]);
+  useEffect(() => { saveToCookie('elzarVoice', elzarVoice); }, [elzarVoice]);
+  useEffect(() => { saveToCookie('servings', servings); }, [servings]);
+  useEffect(() => { saveToCookie('highLeftoverPotential', highLeftoverPotential); }, [highLeftoverPotential]);
+  useEffect(() => { saveToCookie('availableEquipment', availableEquipment); }, [availableEquipment]);
+
   const loadProfiles = async () => {
     try {
       const data = await getAllProfiles();
@@ -93,6 +150,14 @@ function Generator() {
       prev.includes(profileName)
         ? prev.filter((n) => n !== profileName)
         : [...prev, profileName]
+    );
+  };
+
+  const toggleEquipment = (equipment) => {
+    setAvailableEquipment((prev) =>
+      prev.includes(equipment)
+        ? prev.filter((e) => e !== equipment)
+        : [...prev, equipment]
     );
   };
 
@@ -113,6 +178,7 @@ function Generator() {
         elzar_voice: elzarVoice,
         servings,
         high_leftover_potential: highLeftoverPotential,
+        available_equipment: availableEquipment,
         user_prompt: userPrompt || null,
       };
 
@@ -326,6 +392,40 @@ function Generator() {
               />
               <span>High leftover potential</span>
             </label>
+          </div>
+
+          {/* Kitchen Equipment */}
+          <div className="mb-4">
+            <button
+              type="button"
+              onClick={() => setEquipmentExpanded(!equipmentExpanded)}
+              className="w-full flex items-center justify-between bg-gray-700 hover:bg-gray-600 text-white font-medium py-2 px-4 rounded-lg transition-colors"
+            >
+              <span>🍳 Kitchen Equipment ({availableEquipment.length}/{KITCHEN_EQUIPMENT.length})</span>
+              <span className="text-xl">{equipmentExpanded ? '▼' : '▶'}</span>
+            </button>
+            
+            {equipmentExpanded && (
+              <div className="mt-3 p-4 bg-gray-800 rounded-lg border border-gray-700">
+                <p className="text-sm text-gray-400 mb-3">Select available equipment:</p>
+                <div className="grid grid-cols-2 gap-2">
+                  {KITCHEN_EQUIPMENT.map((equipment) => (
+                    <label
+                      key={equipment}
+                      className="flex items-center space-x-2 text-sm cursor-pointer hover:bg-gray-700 p-2 rounded"
+                    >
+                      <input
+                        type="checkbox"
+                        checked={availableEquipment.includes(equipment)}
+                        onChange={() => toggleEquipment(equipment)}
+                        className="form-checkbox h-4 w-4 text-blue-600"
+                      />
+                      <span>{equipment}</span>
+                    </label>
+                  ))}
+                </div>
+              </div>
+            )}
           </div>
 
           {/* Time Slider */}

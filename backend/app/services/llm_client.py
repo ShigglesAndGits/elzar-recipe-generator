@@ -99,6 +99,15 @@ class LLMClient:
                 "- Try to ONLY use ingredients from the available list"
             )
         
+        # Add available equipment
+        available_equipment = request_params.get("available_equipment", [])
+        if available_equipment:
+            prompt_parts.append("")
+            prompt_parts.append("AVAILABLE KITCHEN EQUIPMENT:")
+            for equipment in available_equipment:
+                prompt_parts.append(f"- {equipment}")
+            prompt_parts.append("IMPORTANT: Only use cooking methods that work with the available equipment listed above.")
+        
         # Add dietary restrictions
         if dietary_profiles:
             prompt_parts.append("")

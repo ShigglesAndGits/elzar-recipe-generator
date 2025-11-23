@@ -17,6 +17,7 @@ class RecipeGenerationRequest(BaseModel):
     elzar_voice: bool = True
     servings: str = "3-4"  # 1-2, 3-4, 5-6, 7+
     high_leftover_potential: bool = False
+    available_equipment: List[str] = Field(default_factory=list)  # Kitchen equipment available
     user_prompt: Optional[str] = None  # Additional user notes
 
 

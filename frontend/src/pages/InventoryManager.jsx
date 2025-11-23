@@ -364,9 +364,16 @@ function InventoryManager() {
                     </p>
                   )}
                   {results.purchase.failed.length > 0 && (
-                    <p className="text-sm text-red-400">
-                      ✗ Failed {results.purchase.failed.length} items
-                    </p>
+                    <div className="mt-2">
+                      <p className="text-sm text-red-400 font-semibold">
+                        ✗ Failed {results.purchase.failed.length} items:
+                      </p>
+                      <ul className="text-xs text-red-300 ml-4 mt-1">
+                        {results.purchase.failed.map((item, idx) => (
+                          <li key={idx}>• {item.product_name}: {item.reason}</li>
+                        ))}
+                      </ul>
+                    </div>
                   )}
                 </div>
               )}
@@ -377,9 +384,16 @@ function InventoryManager() {
                     ✓ Consumed {results.consume.success.length} items
                   </p>
                   {results.consume.failed.length > 0 && (
-                    <p className="text-sm text-red-400">
-                      ✗ Failed {results.consume.failed.length} items
-                    </p>
+                    <div className="mt-2">
+                      <p className="text-sm text-red-400 font-semibold">
+                        ✗ Failed {results.consume.failed.length} items:
+                      </p>
+                      <ul className="text-xs text-red-300 ml-4 mt-1">
+                        {results.consume.failed.map((item, idx) => (
+                          <li key={idx}>• {item.product_name}: {item.reason}</li>
+                        ))}
+                      </ul>
+                    </div>
                   )}
                 </div>
               )}

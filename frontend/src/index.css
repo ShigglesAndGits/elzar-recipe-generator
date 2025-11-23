@@ -1,0 +1,101 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+:root {
+  font-family: Inter, system-ui, Avenir, Helvetica, Arial, sans-serif;
+  line-height: 1.5;
+  font-weight: 400;
+
+  color-scheme: light dark;
+  color: rgba(255, 255, 255, 0.87);
+  background-color: #242424;
+
+  font-synthesis: none;
+  text-rendering: optimizeLegibility;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+}
+
+body {
+  margin: 0;
+  display: flex;
+  place-items: center;
+  min-width: 320px;
+  min-height: 100vh;
+}
+
+#root {
+  width: 100%;
+  min-height: 100vh;
+}
+
+/* Kiosk mode styles */
+.kiosk-mode {
+  font-size: 1.2em;
+}
+
+.kiosk-mode button {
+  min-height: 60px;
+  min-width: 60px;
+  font-size: 1.1em;
+}
+
+.kiosk-mode input,
+.kiosk-mode select {
+  min-height: 50px;
+  font-size: 1.1em;
+}
+
+/* Recipe markdown styling */
+.recipe-content {
+  line-height: 1.8;
+}
+
+.recipe-content h1 {
+  font-size: 2em;
+  margin-top: 0.5em;
+  margin-bottom: 0.5em;
+  font-weight: bold;
+}
+
+.recipe-content h2 {
+  font-size: 1.5em;
+  margin-top: 0.8em;
+  margin-bottom: 0.4em;
+  font-weight: bold;
+}
+
+.recipe-content h3 {
+  font-size: 1.25em;
+  margin-top: 0.6em;
+  margin-bottom: 0.3em;
+  font-weight: bold;
+}
+
+.recipe-content ul,
+.recipe-content ol {
+  margin-left: 1.5em;
+  margin-bottom: 1em;
+}
+
+.recipe-content li {
+  margin-bottom: 0.5em;
+}
+
+.recipe-content p {
+  margin-bottom: 1em;
+}
+
+.recipe-content code {
+  background-color: rgba(255, 255, 255, 0.1);
+  padding: 0.2em 0.4em;
+  border-radius: 3px;
+}
+
+.recipe-content hr {
+  margin: 1.5em 0;
+  border: none;
+  border-top: 1px solid rgba(255, 255, 255, 0.2);
+}
+

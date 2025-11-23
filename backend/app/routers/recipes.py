@@ -400,6 +400,10 @@ async def parse_recipe_ingredients(recipe_id: int, action_type: str = "consume")
             for_shopping_list=for_shopping_list
         )
         
+        print(f"🔍 LLM returned {len(ingredients)} ingredients for action_type='{action_type}'")
+        for i, ing in enumerate(ingredients[:3]):  # Show first 3 for debugging
+            print(f"  [{i}] product_id={ing.get('product_id')}, product_name={ing.get('product_name')}, quantity={ing.get('quantity')}, unit={ing.get('unit')}")
+        
         # Format as ParsedItems (same structure as inventory parser)
         from ..models import ParsedItem
         
@@ -411,6 +415,18 @@ async def parse_recipe_ingredients(recipe_id: int, action_type: str = "consume")
         for ing in ingredients:
             product_id = ing.get("product_id")
             product_name = ing.get("product_name", "")
+            
+            # If LLM didn't provide product_id, try to match by name
+            if not product_id and product_name:
+                # Try exact match first
+                matched_product = next(
+                    (p for p in products if p["name"].lower() == product_name.lower()),
+                    None
+                )
+                if matched_product:
+                    product_id = matched_product["id"]
+                    product_name = matched_product["name"]
+                    print(f"✓ Matched '{ing.get('product_name')}' to product ID {product_id}")
             
             # Determine confidence
             if product_id:

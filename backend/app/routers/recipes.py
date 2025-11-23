@@ -428,11 +428,20 @@ async def parse_recipe_ingredients(recipe_id: int):
             unit_str = (ing.get("unit") or "").lower()
             quantity_unit_id = unit_name_to_id.get(unit_str, 2) if unit_str else 2  # Default to Piece
             
+            # Ensure quantity and unit are never None
+            quantity = ing.get("quantity")
+            if quantity is None or not isinstance(quantity, (int, float)):
+                quantity = 1.0
+            
+            unit = ing.get("unit")
+            if not unit or not isinstance(unit, str):
+                unit = "unit"
+            
             parsed_items.append(ParsedItem(
                 original_text=ing.get("ingredient_text", ""),
                 item_name=product_name or ing.get("ingredient_text", ""),
-                quantity=ing.get("quantity", 1.0),
-                unit=ing.get("unit", "unit"),
+                quantity=float(quantity),
+                unit=str(unit),
                 grocy_product_id=product_id,
                 grocy_product_name=product_name if product_id else None,
                 confidence=confidence,

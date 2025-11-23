@@ -871,6 +871,10 @@ async def save_recipe_to_grocy_reviewed(recipe_id: int, request: InventoryAction
                     servings = int(numbers[0])
                     break
         
+        # Get all products for unit lookup
+        all_products = await grocy_client.get_products()
+        product_units = {p["id"]: p.get("qu_id_stock", 1) for p in all_products}
+        
         # Process reviewed ingredients - create missing products
         results = {
             "grocy_recipe_id": None,
@@ -942,9 +946,15 @@ async def save_recipe_to_grocy_reviewed(recipe_id: int, request: InventoryAction
                             product_id = matching_product["id"]
             
             if product_id:
-                # Get quantity unit ID for this ingredient
-                unit_str = item.unit.lower() if item.unit else "unit"
-                qu_id = unit_lookup.get(unit_str, 1)
+                # Use the product's stock quantity unit to avoid conversion errors
+                qu_id = product_units.get(product_id, 1)
+                
+                # Update product_units if we just created this product
+                if product_id not in product_units:
+                    # Refresh product list
+                    all_products = await grocy_client.get_products()
+                    product_units = {p["id"]: p.get("qu_id_stock", 1) for p in all_products}
+                    qu_id = product_units.get(product_id, 1)
                 
                 processed_ingredients.append({
                     "product_id": product_id,

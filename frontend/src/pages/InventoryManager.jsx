@@ -67,13 +67,13 @@ function InventoryManager() {
 
     try {
       const itemData = {
-        product_id: item.matched_product_id,
+        product_id: item.grocy_product_id,  // Use grocy_product_id
         product_name: item.item_name,
         amount: item.quantity,  // Backend expects 'amount', not 'quantity'
         unit: item.unit,
         action: item.action,
-        create_if_missing: item.create_if_missing,  // Use the checkbox value directly
-        location_id: item.suggested_location_id
+        create_if_missing: item.action === 'purchase' ? item.create_if_missing : false,  // Only allow create for purchase
+        location_id: item.location_id  // Use location_id
       };
 
       let result;
@@ -107,25 +107,25 @@ function InventoryManager() {
       const purchaseList = parsedItems
         .filter(item => item.action === 'purchase' && !item.processed)
         .map(item => ({
-          product_id: item.matched_product_id,
+          product_id: item.grocy_product_id,  // Use grocy_product_id
           product_name: item.item_name,
           amount: item.quantity,  // Backend expects 'amount', not 'quantity'
           unit: item.unit,
           action: 'purchase',
           create_if_missing: item.create_if_missing,  // Use the checkbox value directly
-          location_id: item.suggested_location_id
+          location_id: item.location_id  // Use location_id
         }));
 
       const consumeList = parsedItems
         .filter(item => item.action === 'consume' && !item.processed)
         .map(item => ({
-          product_id: item.matched_product_id,
+          product_id: item.grocy_product_id,  // Use grocy_product_id, not matched_product_id
           product_name: item.item_name,
           amount: item.quantity,  // Backend expects 'amount', not 'quantity'
           unit: item.unit,
           action: 'consume',
-          create_if_missing: false,
-          location_id: item.suggested_location_id
+          create_if_missing: false,  // Cannot create products when consuming
+          location_id: item.location_id  // Use location_id, not suggested_location_id
         }));
 
       const results = {

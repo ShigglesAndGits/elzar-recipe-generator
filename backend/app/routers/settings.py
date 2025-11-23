@@ -180,23 +180,23 @@ async def test_grocy_connection():
         )
 
 
-@router.post("/setup-unit-conversions/{system}")
-async def setup_unit_conversions(system: str):
+@router.post("/setup-unit-conversions")
+async def setup_unit_conversions():
     """
-    Set up common unit conversions in Grocy
+    Set up comprehensive kitchen unit conversions in Grocy
     
-    Args:
-        system: 'metric' or 'imperial'
+    Creates all common cooking/kitchen units and conversions including:
+    - Metric weight (g, kg, mg)
+    - Imperial weight (oz, lb)
+    - Metric volume (ml, l, cl, dl)
+    - Imperial volume (fl oz, cup, pt, qt, gal)
+    - Cooking measures (tsp, tbsp, pinch, dash)
+    - Count units (piece, slice, clove, etc.)
+    - Cross-system conversions (metric ↔ imperial)
     
     Returns:
         Summary of units and conversions created
     """
-    if system not in ["metric", "imperial"]:
-        raise HTTPException(
-            status_code=status.HTTP_400_BAD_REQUEST,
-            detail="System must be 'metric' or 'imperial'"
-        )
-    
     config = await get_effective_config()
     grocy_client = GrocyClient(config["grocy_url"], config["grocy_api_key"])
     
@@ -212,51 +212,96 @@ async def setup_unit_conversions(system: str):
         existing_units = await grocy_client.get_quantity_units()
         existing_unit_names = {u["name"].lower(): u["id"] for u in existing_units}
         
-        # Define common units and conversions
-        if system == "metric":
-            units_to_create = [
-                ("Gram", "Grams", "g"),
-                ("Kilogram", "Kilograms", "kg"),
-                ("Milliliter", "Milliliters", "ml"),
-                ("Liter", "Liters", "l"),
-                ("Teaspoon", "Teaspoons", "tsp"),
-                ("Tablespoon", "Tablespoons", "tbsp"),
-                ("Cup", "Cups", "cup")
-            ]
+        # Comprehensive kitchen units
+        units_to_create = [
+            # Metric Weight
+            ("Milligram", "Milligrams", "mg"),
+            ("Gram", "Grams", "g"),
+            ("Kilogram", "Kilograms", "kg"),
             
-            conversions = [
-                # Weight
-                ("Kilogram", "Gram", 1000),
-                # Volume
-                ("Liter", "Milliliter", 1000),
-                ("Cup", "Milliliter", 240),
-                ("Tablespoon", "Milliliter", 15),
-                ("Teaspoon", "Milliliter", 5),
-            ]
-        else:  # imperial
-            units_to_create = [
-                ("Ounce", "Ounces", "oz"),
-                ("Pound", "Pounds", "lb"),
-                ("Fluid Ounce", "Fluid Ounces", "fl oz"),
-                ("Cup", "Cups", "cup"),
-                ("Pint", "Pints", "pt"),
-                ("Quart", "Quarts", "qt"),
-                ("Gallon", "Gallons", "gal"),
-                ("Teaspoon", "Teaspoons", "tsp"),
-                ("Tablespoon", "Tablespoons", "tbsp")
-            ]
+            # Imperial Weight
+            ("Ounce", "Ounces", "oz"),
+            ("Pound", "Pounds", "lb"),
             
-            conversions = [
-                # Weight
-                ("Pound", "Ounce", 16),
-                # Volume
-                ("Gallon", "Quart", 4),
-                ("Quart", "Pint", 2),
-                ("Pint", "Cup", 2),
-                ("Cup", "Fluid Ounce", 8),
-                ("Fluid Ounce", "Tablespoon", 2),
-                ("Tablespoon", "Teaspoon", 3),
-            ]
+            # Metric Volume
+            ("Milliliter", "Milliliters", "ml"),
+            ("Centiliter", "Centiliters", "cl"),
+            ("Deciliter", "Deciliters", "dl"),
+            ("Liter", "Liters", "l"),
+            
+            # Imperial Volume
+            ("Teaspoon", "Teaspoons", "tsp"),
+            ("Tablespoon", "Tablespoons", "tbsp"),
+            ("Fluid Ounce", "Fluid Ounces", "fl oz"),
+            ("Cup", "Cups", "cup"),
+            ("Pint", "Pints", "pt"),
+            ("Quart", "Quarts", "qt"),
+            ("Gallon", "Gallons", "gal"),
+            
+            # Small measures
+            ("Pinch", "Pinches", "pinch"),
+            ("Dash", "Dashes", "dash"),
+            
+            # Count/Piece
+            ("Piece", "Pieces", "pc"),
+            ("Slice", "Slices", "slice"),
+            ("Clove", "Cloves", "clove"),
+            ("Stick", "Sticks", "stick"),
+            ("Can", "Cans", "can"),
+            ("Package", "Packages", "pkg"),
+            ("Bottle", "Bottles", "bottle"),
+            ("Jar", "Jars", "jar"),
+            ("Bunch", "Bunches", "bunch"),
+            ("Head", "Heads", "head"),
+            ("Leaf", "Leaves", "leaf"),
+            ("Sprig", "Sprigs", "sprig"),
+        ]
+        
+        # Comprehensive conversions
+        conversions = [
+            # Metric Weight
+            ("Kilogram", "Gram", 1000),
+            ("Gram", "Milligram", 1000),
+            
+            # Imperial Weight
+            ("Pound", "Ounce", 16),
+            
+            # Metric Volume
+            ("Liter", "Deciliter", 10),
+            ("Deciliter", "Centiliter", 10),
+            ("Centiliter", "Milliliter", 10),
+            ("Liter", "Milliliter", 1000),
+            
+            # Imperial Volume
+            ("Gallon", "Quart", 4),
+            ("Quart", "Pint", 2),
+            ("Pint", "Cup", 2),
+            ("Cup", "Fluid Ounce", 8),
+            ("Fluid Ounce", "Tablespoon", 2),
+            ("Tablespoon", "Teaspoon", 3),
+            
+            # Cooking measures
+            ("Teaspoon", "Dash", 8),
+            ("Dash", "Pinch", 2),
+            
+            # Cross-system: Weight (metric ↔ imperial)
+            ("Pound", "Gram", 453.592),
+            ("Kilogram", "Pound", 2.20462),
+            ("Ounce", "Gram", 28.3495),
+            
+            # Cross-system: Volume (metric ↔ imperial)
+            ("Gallon", "Liter", 3.78541),
+            ("Quart", "Liter", 0.946353),
+            ("Pint", "Milliliter", 473.176),
+            ("Cup", "Milliliter", 236.588),
+            ("Fluid Ounce", "Milliliter", 29.5735),
+            ("Tablespoon", "Milliliter", 14.7868),
+            ("Teaspoon", "Milliliter", 4.92892),
+            
+            # Common cooking conversions
+            ("Liter", "Cup", 4.22675),
+            ("Kilogram", "Ounce", 35.274),
+        ]
         
         # Create units
         unit_id_map = {}

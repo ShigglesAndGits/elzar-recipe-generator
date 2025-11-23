@@ -105,16 +105,16 @@ function Settings() {
     setEditForm({});
   };
 
-  const handleSetupUnitConversions = async (system) => {
-    if (!confirm(`This will create common ${system} units and conversions in Grocy. Continue?`)) {
+  const handleSetupUnitConversions = async () => {
+    if (!confirm('This will create comprehensive kitchen units and conversions in Grocy (metric, imperial, and cross-conversions). Continue?')) {
       return;
     }
 
     setSettingUpUnits(true);
     try {
-      const result = await setupUnitConversions(system);
+      const result = await setupUnitConversions();
       
-      let message = `✅ ${system.toUpperCase()} Unit Setup Complete!\n\n`;
+      let message = `✅ Kitchen Unit Setup Complete!\n\n`;
       message += `📊 Summary:\n`;
       message += `• Units created: ${result.summary.units_created}\n`;
       message += `• Units already existing: ${result.summary.units_existing}\n`;
@@ -129,9 +129,9 @@ function Settings() {
         message += `\nNew units: ${result.details.units_created.join(', ')}`;
       }
       if (result.details.conversions_created.length > 0) {
-        message += `\n\nConversions:\n${result.details.conversions_created.slice(0, 5).join('\n')}`;
-        if (result.details.conversions_created.length > 5) {
-          message += `\n... and ${result.details.conversions_created.length - 5} more`;
+        message += `\n\nConversions (showing first 10):\n${result.details.conversions_created.slice(0, 10).join('\n')}`;
+        if (result.details.conversions_created.length > 10) {
+          message += `\n... and ${result.details.conversions_created.length - 10} more`;
         }
       }
       
@@ -503,64 +503,69 @@ function Settings() {
         <h2 className="text-2xl font-bold mb-4">Grocy Unit Conversions</h2>
         
         <p className="text-gray-300 mb-4">
-          Set up common unit conversions in Grocy for automatic quantity conversion.
-          This enables Grocy to convert between units like kg ↔ g, gallons ↔ cups, etc.
+          Set up comprehensive kitchen unit conversions in Grocy for automatic quantity conversion.
+          This creates all common cooking units and conversions including metric, imperial, and cross-system conversions.
         </p>
 
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-          {/* Metric Setup */}
-          <div className="bg-gray-700 rounded-lg p-4">
-            <h3 className="font-semibold mb-2 flex items-center">
-              <span className="text-2xl mr-2">📏</span>
-              Metric System
+        <div className="bg-gray-700 rounded-lg p-6">
+          <div className="mb-4">
+            <h3 className="font-semibold mb-2 flex items-center text-lg">
+              <span className="text-2xl mr-2">🔧</span>
+              Complete Kitchen Units Setup
             </h3>
             <p className="text-sm text-gray-400 mb-3">
-              Sets up: kg, g, l, ml, tsp, tbsp, cup
+              Creates all common units and conversions in one go:
             </p>
-            <button
-              onClick={() => handleSetupUnitConversions('metric')}
-              disabled={settingUpUnits}
-              className="w-full bg-blue-600 hover:bg-blue-700 disabled:bg-gray-600 text-white font-semibold px-4 py-2 rounded-lg transition-colors"
-            >
-              {settingUpUnits ? 'Setting up...' : 'Setup Metric Conversions'}
-            </button>
-            <div className="mt-2 text-xs text-gray-400">
-              <p>Conversions:</p>
-              <ul className="list-disc list-inside ml-2 mt-1">
-                <li>1 kg = 1000 g</li>
-                <li>1 l = 1000 ml</li>
-                <li>1 cup = 240 ml</li>
-                <li>1 tbsp = 15 ml</li>
-                <li>1 tsp = 5 ml</li>
-              </ul>
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-4 text-xs text-gray-300">
+              <div>
+                <p className="font-semibold mb-1">📏 Metric Weight:</p>
+                <p>mg, g, kg</p>
+              </div>
+              <div>
+                <p className="font-semibold mb-1">📐 Imperial Weight:</p>
+                <p>oz, lb</p>
+              </div>
+              <div>
+                <p className="font-semibold mb-1">🥤 Metric Volume:</p>
+                <p>ml, cl, dl, l</p>
+              </div>
+              <div>
+                <p className="font-semibold mb-1">🥛 Imperial Volume:</p>
+                <p>tsp, tbsp, fl oz, cup, pt, qt, gal</p>
+              </div>
+              <div>
+                <p className="font-semibold mb-1">🧂 Small Measures:</p>
+                <p>pinch, dash</p>
+              </div>
+              <div>
+                <p className="font-semibold mb-1">📦 Count Units:</p>
+                <p>piece, slice, clove, stick, can, bottle, jar, bunch, head, etc.</p>
+              </div>
             </div>
           </div>
-
-          {/* Imperial Setup */}
-          <div className="bg-gray-700 rounded-lg p-4">
-            <h3 className="font-semibold mb-2 flex items-center">
-              <span className="text-2xl mr-2">📐</span>
-              Imperial System
-            </h3>
-            <p className="text-sm text-gray-400 mb-3">
-              Sets up: lb, oz, gal, qt, pt, cup, fl oz, tbsp, tsp
-            </p>
-            <button
-              onClick={() => handleSetupUnitConversions('imperial')}
-              disabled={settingUpUnits}
-              className="w-full bg-orange-600 hover:bg-orange-700 disabled:bg-gray-600 text-white font-semibold px-4 py-2 rounded-lg transition-colors"
-            >
-              {settingUpUnits ? 'Setting up...' : 'Setup Imperial Conversions'}
-            </button>
-            <div className="mt-2 text-xs text-gray-400">
-              <p>Conversions:</p>
-              <ul className="list-disc list-inside ml-2 mt-1">
+          
+          <button
+            onClick={handleSetupUnitConversions}
+            disabled={settingUpUnits}
+            className="w-full bg-gradient-to-r from-blue-600 to-purple-600 hover:from-blue-700 hover:to-purple-700 disabled:from-gray-600 disabled:to-gray-600 text-white font-semibold px-6 py-3 rounded-lg transition-all transform hover:scale-105"
+          >
+            {settingUpUnits ? '⏳ Setting up units...' : '🚀 Setup All Kitchen Units & Conversions'}
+          </button>
+          
+          <div className="mt-4 text-xs text-gray-400">
+            <p className="font-semibold mb-2">Includes conversions like:</p>
+            <div className="grid grid-cols-2 gap-2">
+              <ul className="list-disc list-inside ml-2">
+                <li>1 kg = 1000 g</li>
                 <li>1 lb = 16 oz</li>
-                <li>1 gal = 4 qt</li>
-                <li>1 qt = 2 pt</li>
-                <li>1 pt = 2 cups</li>
-                <li>1 cup = 8 fl oz</li>
-                <li>1 tbsp = 3 tsp</li>
+                <li>1 lb = 453.592 g</li>
+                <li>1 gal = 3.785 l</li>
+              </ul>
+              <ul className="list-disc list-inside ml-2">
+                <li>1 cup = 236.588 ml</li>
+                <li>1 tbsp = 14.787 ml</li>
+                <li>1 tsp = 4.929 ml</li>
+                <li>...and many more!</li>
               </ul>
             </div>
           </div>
@@ -568,8 +573,8 @@ function Settings() {
 
         <div className="mt-4 bg-blue-900 border border-blue-700 rounded p-3 text-blue-200">
           <p className="text-sm">
-            💡 <strong>Tip:</strong> These buttons will create units and conversions in Grocy. 
-            Existing units won't be duplicated. You can run both metric and imperial if needed!
+            💡 <strong>Tip:</strong> This will create ~30 units and ~30 conversions in Grocy. 
+            Existing units won't be duplicated. Safe to run multiple times!
           </p>
         </div>
       </div>

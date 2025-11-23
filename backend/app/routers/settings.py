@@ -1,9 +1,10 @@
 from fastapi import APIRouter, HTTPException, status
 from pydantic import BaseModel
-from typing import Dict, Any
+from typing import Dict, Any, Optional
 
 from ..database import db
 from ..config import settings
+from ..utils.config_manager import get_effective_config
 
 router = APIRouter(prefix="/api/settings", tags=["settings"])
 
@@ -16,22 +17,96 @@ class SettingValue(BaseModel):
 class ConfigResponse(BaseModel):
     """Response model for configuration"""
     grocy_url: str
+    grocy_api_key: str  # Masked in response
     llm_api_url: str
+    llm_api_key: str    # Masked in response
     llm_model: str
     max_recipe_history: int
+    apprise_url: Optional[str] = None
     notification_configured: bool
+
+
+class CoreConfigUpdate(BaseModel):
+    """Model for updating core configuration"""
+    grocy_url: Optional[str] = None
+    grocy_api_key: Optional[str] = None
+    llm_api_url: Optional[str] = None
+    llm_api_key: Optional[str] = None
+    llm_model: Optional[str] = None
+    max_recipe_history: Optional[int] = None
+    apprise_url: Optional[str] = None
 
 
 @router.get("/config", response_model=ConfigResponse)
 async def get_config():
-    """Get current application configuration (without sensitive data)"""
+    """Get current effective configuration"""
+    config = await get_effective_config()
+    
+    # Mask secrets
+    grocy_key = config["grocy_api_key"]
+    if grocy_key and len(grocy_key) > 8:
+        masked_grocy = f"{grocy_key[:4]}...{grocy_key[-4:]}"
+    elif grocy_key:
+        masked_grocy = "***"
+    else:
+        masked_grocy = ""
+        
+    llm_key = config["llm_api_key"]
+    if llm_key and len(llm_key) > 8:
+        masked_llm = f"{llm_key[:4]}...{llm_key[-4:]}"
+    elif llm_key:
+        masked_llm = "***"
+    else:
+        masked_llm = ""
+        
     return ConfigResponse(
-        grocy_url=settings.grocy_url,
-        llm_api_url=settings.llm_api_url,
-        llm_model=settings.llm_model,
-        max_recipe_history=settings.max_recipe_history,
-        notification_configured=settings.apprise_url is not None and settings.apprise_url != ""
+        grocy_url=config["grocy_url"],
+        grocy_api_key=masked_grocy,
+        llm_api_url=config["llm_api_url"],
+        llm_api_key=masked_llm,
+        llm_model=config["llm_model"],
+        max_recipe_history=config["max_recipe_history"],
+        apprise_url=config["apprise_url"],
+        notification_configured=config["apprise_url"] is not None and config["apprise_url"] != ""
     )
+
+
+@router.post("/config/update")
+async def update_core_config(update: CoreConfigUpdate):
+    """
+    Update core configuration values in the database.
+    These override environment variables.
+    """
+    try:
+        if update.grocy_url is not None:
+            await db.set_setting("GROCY_URL", update.grocy_url)
+        
+        if update.grocy_api_key is not None and update.grocy_api_key != "***":
+            # Only update if provided and not just the masked value
+            await db.set_setting("GROCY_API_KEY", update.grocy_api_key)
+            
+        if update.llm_api_url is not None:
+            await db.set_setting("LLM_API_URL", update.llm_api_url)
+            
+        if update.llm_api_key is not None and update.llm_api_key != "***":
+            await db.set_setting("LLM_API_KEY", update.llm_api_key)
+            
+        if update.llm_model is not None:
+            await db.set_setting("LLM_MODEL", update.llm_model)
+            
+        if update.max_recipe_history is not None:
+            await db.set_setting("MAX_RECIPE_HISTORY", str(update.max_recipe_history))
+            
+        if update.apprise_url is not None:
+            await db.set_setting("APPRISE_URL", update.apprise_url)
+            
+        return {"status": "success", "message": "Configuration updated successfully"}
+        
+    except Exception as e:
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=f"Failed to update configuration: {str(e)}"
+        )
 
 
 @router.get("/")
@@ -66,8 +141,10 @@ async def test_grocy_connection():
     """Test Grocy API connection"""
     from ..services.grocy_client import GrocyClient
     
+    config = await get_effective_config()
+    
     try:
-        client = GrocyClient(settings.grocy_url, settings.grocy_api_key)
+        client = GrocyClient(config["grocy_url"], config["grocy_api_key"])
         stock = await client.get_stock()
         
         return {
@@ -87,11 +164,13 @@ async def test_llm_connection():
     """Test LLM API connection"""
     from ..services.llm_client import LLMClient
     
+    config = await get_effective_config()
+    
     try:
         client = LLMClient(
-            settings.llm_api_url,
-            settings.llm_api_key,
-            settings.llm_model
+            config["llm_api_url"],
+            config["llm_api_key"],
+            config["llm_model"]
         )
         
         # Simple test prompt
@@ -129,4 +208,3 @@ async def test_llm_connection():
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
             detail=f"Failed to connect to LLM: {str(e)}"
         )
-

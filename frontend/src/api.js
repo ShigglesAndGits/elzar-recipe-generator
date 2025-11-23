@@ -85,6 +85,11 @@ export const getConfig = async () => {
   return response.data;
 };
 
+export const updateConfig = async (configData) => {
+  const response = await api.post('/api/settings/config/update', configData);
+  return response.data;
+};
+
 export const getAllSettings = async () => {
   const response = await api.get('/api/settings/');
   return response.data;
@@ -111,4 +116,3 @@ export const testLLMConnection = async () => {
 };
 
 export default api;
-

@@ -18,13 +18,9 @@ from ..utils.recipe_parser import (
     extract_metadata_from_recipe,
     format_recipe_for_download
 )
+from ..utils.config_manager import get_effective_config
 
 router = APIRouter(prefix="/api/recipes", tags=["recipes"])
-
-# Initialize clients
-grocy_client = GrocyClient(settings.grocy_url, settings.grocy_api_key)
-llm_client = LLMClient(settings.llm_api_url, settings.llm_api_key, settings.llm_model)
-notification_service = NotificationService(settings.apprise_url)
 
 
 @router.post("/generate", response_model=RecipeResponse)
@@ -34,6 +30,12 @@ async def generate_recipe(request: RecipeGenerationRequest):
     
     BAM! Let's make something delicious! 🌶️
     """
+    config = await get_effective_config()
+    
+    # Initialize clients with effective config
+    grocy_client = GrocyClient(config["grocy_url"], config["grocy_api_key"])
+    llm_client = LLMClient(config["llm_api_url"], config["llm_api_key"], config["llm_model"])
+    
     try:
         # Fetch Grocy inventory
         inventory = await grocy_client.format_inventory_for_llm(
@@ -88,14 +90,14 @@ async def generate_recipe(request: RecipeGenerationRequest):
             "active_profiles": request.active_profiles,
             "grocy_inventory_snapshot": inventory,
             "user_prompt": request.user_prompt,
-            "llm_model": settings.llm_model
+            "llm_model": config["llm_model"]
         }
         
         # Save to database
         recipe_id = await db.create_recipe(recipe_data)
         
         # Clean up old recipes if needed
-        await db.cleanup_old_recipes(settings.max_recipe_history)
+        await db.cleanup_old_recipes(config["max_recipe_history"])
         
         # Get the saved recipe
         saved_recipe = await db.get_recipe(recipe_id)
@@ -129,6 +131,11 @@ async def regenerate_recipe(recipe_id: int):
     
     BAM! Let's try something different! 🌶️
     """
+    config = await get_effective_config()
+    
+    # Initialize LLM client
+    llm_client = LLMClient(config["llm_api_url"], config["llm_api_key"], config["llm_model"])
+    
     try:
         # Get the original recipe
         original = await db.get_recipe(recipe_id)
@@ -191,11 +198,11 @@ async def regenerate_recipe(recipe_id: int):
             "active_profiles": active_profiles,
             "grocy_inventory_snapshot": inventory,
             "user_prompt": original["user_prompt"],
-            "llm_model": settings.llm_model
+            "llm_model": config["llm_model"]
         }
         
         new_recipe_id = await db.create_recipe(recipe_data)
-        await db.cleanup_old_recipes(settings.max_recipe_history)
+        await db.cleanup_old_recipes(config["max_recipe_history"])
         
         # Get the saved recipe
         saved_recipe = await db.get_recipe(new_recipe_id)
@@ -251,6 +258,7 @@ async def get_recipe(recipe_id: int):
 @router.get("/{recipe_id}/download")
 async def download_recipe(recipe_id: int):
     """Download recipe as a text file"""
+    config = await get_effective_config()
     recipe = await db.get_recipe(recipe_id)
     if not recipe:
         raise HTTPException(
@@ -274,7 +282,7 @@ async def download_recipe(recipe_id: int):
     )
     
     # Save to file
-    export_path = Path(settings.recipe_export_path)
+    export_path = Path(config["recipe_export_path"])
     export_path.mkdir(parents=True, exist_ok=True)
     
     filename = f"recipe_{recipe_id}_{datetime.now().strftime('%Y%m%d_%H%M%S')}.txt"
@@ -294,6 +302,9 @@ async def download_recipe(recipe_id: int):
 @router.post("/{recipe_id}/send")
 async def send_recipe_notification(recipe_id: int, notification: NotificationRequest):
     """Send recipe to phone via notification service"""
+    config = await get_effective_config()
+    notification_service = NotificationService(config["apprise_url"])
+    
     if not notification_service.is_configured():
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
@@ -326,4 +337,3 @@ async def send_recipe_notification(recipe_id: int, notification: NotificationReq
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
             detail=f"Error sending notification: {str(e)}"
         )
-

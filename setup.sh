@@ -8,6 +8,52 @@ set -e
 echo "🌶️  Welcome to Elzar Setup! BAM!"
 echo ""
 
+# Check if running as root (for auto-install)
+IS_ROOT=false
+if [ "$EUID" -eq 0 ]; then
+    IS_ROOT=true
+fi
+
+# Bootstrap mode: Install system dependencies if running as root
+if [ "$IS_ROOT" = true ]; then
+    echo "Running as root - checking for system dependencies..."
+    
+    NEEDS_INSTALL=false
+    
+    # Check for required packages
+    if ! command -v git &> /dev/null; then
+        NEEDS_INSTALL=true
+    fi
+    if ! command -v python3 &> /dev/null; then
+        NEEDS_INSTALL=true
+    fi
+    if ! command -v node &> /dev/null; then
+        NEEDS_INSTALL=true
+    fi
+    
+    if [ "$NEEDS_INSTALL" = true ]; then
+        echo "Installing system dependencies (git, python3, nodejs, npm)..."
+        echo "This may take a few minutes..."
+        
+        # Detect OS
+        if [ -f /etc/debian_version ]; then
+            # Debian/Ubuntu
+            apt-get update -qq
+            apt-get install -y -qq git python3 python3-venv python3-pip nodejs npm > /dev/null 2>&1
+            echo "✓ System dependencies installed"
+        elif [ -f /etc/redhat-release ]; then
+            # RHEL/CentOS/Fedora
+            yum install -y git python3 python3-pip nodejs npm
+            echo "✓ System dependencies installed"
+        else
+            echo "⚠️  Unknown OS. Please install git, python3, and nodejs manually."
+        fi
+    else
+        echo "✓ System dependencies already installed"
+    fi
+    echo ""
+fi
+
 # Check Python
 echo "Checking Python installation..."
 if ! command -v python3 &> /dev/null; then

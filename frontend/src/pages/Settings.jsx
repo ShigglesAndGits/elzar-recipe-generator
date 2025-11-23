@@ -1,10 +1,15 @@
 import React, { useState, useEffect } from 'react';
-import { getConfig, testGrocyConnection, testLLMConnection } from '../api';
+import { getConfig, updateConfig, testGrocyConnection, testLLMConnection } from '../api';
 
 function Settings() {
   const [config, setConfig] = useState(null);
   const [loading, setLoading] = useState(true);
   const [kioskMode, setKioskMode] = useState(false);
+  
+  // Edit mode
+  const [editMode, setEditMode] = useState(false);
+  const [editForm, setEditForm] = useState({});
+  const [saving, setSaving] = useState(false);
   
   // Test results
   const [grocyTestResult, setGrocyTestResult] = useState(null);
@@ -78,6 +83,40 @@ function Settings() {
     }
   };
 
+  const handleEditConfig = () => {
+    setEditForm({
+      grocy_url: config.grocy_url,
+      grocy_api_key: '',  // Don't prefill masked keys
+      llm_api_url: config.llm_api_url,
+      llm_api_key: '',
+      llm_model: config.llm_model,
+      max_recipe_history: config.max_recipe_history,
+      apprise_url: config.apprise_url || '',
+    });
+    setEditMode(true);
+  };
+
+  const handleCancelEdit = () => {
+    setEditMode(false);
+    setEditForm({});
+  };
+
+  const handleSaveConfig = async () => {
+    setSaving(true);
+    try {
+      await updateConfig(editForm);
+      await loadConfig();
+      setEditMode(false);
+      setEditForm({});
+      alert('Configuration saved successfully! 🌶️');
+    } catch (err) {
+      console.error('Failed to save config:', err);
+      alert(err.response?.data?.detail || 'Failed to save configuration');
+    } finally {
+      setSaving(false);
+    }
+  };
+
   if (loading) {
     return (
       <div className="max-w-4xl mx-auto">
@@ -137,50 +176,168 @@ function Settings() {
       {/* Current Configuration */}
       {config && (
         <div className="bg-gray-800 rounded-lg p-6 shadow-lg">
-          <h2 className="text-2xl font-bold mb-4">Current Configuration</h2>
+          <div className="flex justify-between items-center mb-4">
+            <h2 className="text-2xl font-bold">Configuration</h2>
+            {!editMode && (
+              <button
+                onClick={handleEditConfig}
+                className="bg-elzar-orange hover:bg-orange-600 text-white px-4 py-2 rounded-lg transition-colors"
+              >
+                Edit Configuration
+              </button>
+            )}
+          </div>
           
-          <div className="space-y-4">
-            <div className="bg-gray-700 rounded-lg p-4">
-              <h3 className="font-semibold mb-2">Grocy Instance</h3>
-              <p className="text-sm text-gray-300 font-mono break-all">
-                {config.grocy_url}
+          {!editMode ? (
+            <div className="space-y-4">
+              <div className="bg-gray-700 rounded-lg p-4">
+                <h3 className="font-semibold mb-2">Grocy Instance</h3>
+                <p className="text-sm text-gray-300 font-mono break-all">
+                  {config.grocy_url}
+                </p>
+                <p className="text-xs text-gray-500 mt-1">
+                  API Key: {config.grocy_api_key || 'Not set'}
+                </p>
+              </div>
+
+              <div className="bg-gray-700 rounded-lg p-4">
+                <h3 className="font-semibold mb-2">LLM Configuration</h3>
+                <p className="text-sm text-gray-300">
+                  <span className="text-gray-400">API URL:</span> <span className="font-mono">{config.llm_api_url}</span>
+                </p>
+                <p className="text-sm text-gray-300 mt-1">
+                  <span className="text-gray-400">Model:</span> <span className="font-mono">{config.llm_model}</span>
+                </p>
+                <p className="text-xs text-gray-500 mt-1">
+                  API Key: {config.llm_api_key || 'Not set'}
+                </p>
+              </div>
+
+              <div className="bg-gray-700 rounded-lg p-4">
+                <h3 className="font-semibold mb-2">Recipe History</h3>
+                <p className="text-sm text-gray-300">
+                  Maximum recipes stored: <span className="font-mono">{config.max_recipe_history}</span>
+                </p>
+              </div>
+
+              <div className="bg-gray-700 rounded-lg p-4">
+                <h3 className="font-semibold mb-2">Notifications</h3>
+                <p className="text-sm text-gray-300">
+                  Status: {config.notification_configured ? (
+                    <span className="text-green-400">✓ Configured</span>
+                  ) : (
+                    <span className="text-yellow-400">⚠ Not configured</span>
+                  )}
+                </p>
+              </div>
+            </div>
+          ) : (
+            <div className="space-y-4">
+              <div>
+                <label className="block text-sm font-medium mb-2">Grocy URL *</label>
+                <input
+                  type="text"
+                  value={editForm.grocy_url || ''}
+                  onChange={(e) => setEditForm({...editForm, grocy_url: e.target.value})}
+                  className="w-full bg-gray-700 border border-gray-600 rounded-lg px-4 py-2 focus:ring-2 focus:ring-elzar-red"
+                  placeholder="https://your-grocy-instance.com"
+                />
+              </div>
+
+              <div>
+                <label className="block text-sm font-medium mb-2">Grocy API Key</label>
+                <input
+                  type="password"
+                  value={editForm.grocy_api_key || ''}
+                  onChange={(e) => setEditForm({...editForm, grocy_api_key: e.target.value})}
+                  className="w-full bg-gray-700 border border-gray-600 rounded-lg px-4 py-2 focus:ring-2 focus:ring-elzar-red"
+                  placeholder="Leave blank to keep existing key"
+                />
+              </div>
+
+              <div>
+                <label className="block text-sm font-medium mb-2">LLM API URL *</label>
+                <input
+                  type="text"
+                  value={editForm.llm_api_url || ''}
+                  onChange={(e) => setEditForm({...editForm, llm_api_url: e.target.value})}
+                  className="w-full bg-gray-700 border border-gray-600 rounded-lg px-4 py-2 focus:ring-2 focus:ring-elzar-red"
+                  placeholder="https://openrouter.ai/api/v1"
+                />
+              </div>
+
+              <div>
+                <label className="block text-sm font-medium mb-2">LLM API Key</label>
+                <input
+                  type="password"
+                  value={editForm.llm_api_key || ''}
+                  onChange={(e) => setEditForm({...editForm, llm_api_key: e.target.value})}
+                  className="w-full bg-gray-700 border border-gray-600 rounded-lg px-4 py-2 focus:ring-2 focus:ring-elzar-red"
+                  placeholder="Leave blank to keep existing key"
+                />
+              </div>
+
+              <div>
+                <label className="block text-sm font-medium mb-2">LLM Model *</label>
+                <input
+                  type="text"
+                  value={editForm.llm_model || ''}
+                  onChange={(e) => setEditForm({...editForm, llm_model: e.target.value})}
+                  className="w-full bg-gray-700 border border-gray-600 rounded-lg px-4 py-2 focus:ring-2 focus:ring-elzar-red"
+                  placeholder="google/gemini-2.0-flash-exp:free"
+                />
+              </div>
+
+              <div>
+                <label className="block text-sm font-medium mb-2">Max Recipe History</label>
+                <input
+                  type="number"
+                  value={editForm.max_recipe_history || ''}
+                  onChange={(e) => setEditForm({...editForm, max_recipe_history: parseInt(e.target.value)})}
+                  className="w-full bg-gray-700 border border-gray-600 rounded-lg px-4 py-2 focus:ring-2 focus:ring-elzar-red"
+                  placeholder="1000"
+                />
+              </div>
+
+              <div>
+                <label className="block text-sm font-medium mb-2">Apprise Notification URL</label>
+                <input
+                  type="text"
+                  value={editForm.apprise_url || ''}
+                  onChange={(e) => setEditForm({...editForm, apprise_url: e.target.value})}
+                  className="w-full bg-gray-700 border border-gray-600 rounded-lg px-4 py-2 focus:ring-2 focus:ring-elzar-red"
+                  placeholder="pbul://your_pushbullet_key"
+                />
+                <p className="text-xs text-gray-400 mt-1">
+                  See <a href="https://github.com/caronc/apprise" target="_blank" rel="noopener noreferrer" className="text-elzar-orange hover:underline">Apprise docs</a> for URL formats
+                </p>
+              </div>
+
+              <div className="flex space-x-2">
+                <button
+                  onClick={handleSaveConfig}
+                  disabled={saving}
+                  className="bg-elzar-red hover:bg-red-600 disabled:bg-gray-600 text-white px-6 py-2 rounded-lg transition-colors"
+                >
+                  {saving ? 'Saving...' : 'Save Changes'}
+                </button>
+                <button
+                  onClick={handleCancelEdit}
+                  className="bg-gray-700 hover:bg-gray-600 text-white px-6 py-2 rounded-lg transition-colors"
+                >
+                  Cancel
+                </button>
+              </div>
+            </div>
+          )}
+
+          {!editMode && (
+            <div className="mt-4 bg-blue-900 border border-blue-700 rounded-lg p-4 text-blue-200">
+              <p className="text-sm">
+                💡 Changes made here override environment variables. You can also edit the <code className="bg-blue-800 px-2 py-1 rounded">.env</code> file in the backend directory.
               </p>
             </div>
-
-            <div className="bg-gray-700 rounded-lg p-4">
-              <h3 className="font-semibold mb-2">LLM Configuration</h3>
-              <p className="text-sm text-gray-300">
-                <span className="text-gray-400">API URL:</span> <span className="font-mono">{config.llm_api_url}</span>
-              </p>
-              <p className="text-sm text-gray-300 mt-1">
-                <span className="text-gray-400">Model:</span> <span className="font-mono">{config.llm_model}</span>
-              </p>
-            </div>
-
-            <div className="bg-gray-700 rounded-lg p-4">
-              <h3 className="font-semibold mb-2">Recipe History</h3>
-              <p className="text-sm text-gray-300">
-                Maximum recipes stored: <span className="font-mono">{config.max_recipe_history}</span>
-              </p>
-            </div>
-
-            <div className="bg-gray-700 rounded-lg p-4">
-              <h3 className="font-semibold mb-2">Notifications</h3>
-              <p className="text-sm text-gray-300">
-                Status: {config.notification_configured ? (
-                  <span className="text-green-400">✓ Configured</span>
-                ) : (
-                  <span className="text-yellow-400">⚠ Not configured</span>
-                )}
-              </p>
-            </div>
-          </div>
-
-          <div className="mt-4 bg-blue-900 border border-blue-700 rounded-lg p-4 text-blue-200">
-            <p className="text-sm">
-              💡 To change these settings, edit the <code className="bg-blue-800 px-2 py-1 rounded">.env</code> file in the backend directory and restart the server.
-            </p>
-          </div>
+          )}
         </div>
       )}
 

@@ -61,17 +61,24 @@ For each food item you find in the input text:
 1. Extract the item name (normalized, e.g., "2% milk" -> "Milk", "org bnnas" -> "Organic Bananas")
 2. Extract quantity as a number
 3. Extract or infer the unit. {unit_guidance}
-4. Match to the best Grocy product from the list above (use product ID)
+4. **MATCH TO EXISTING GROCY PRODUCTS WHENEVER POSSIBLE** (use product ID from list above)
 5. Choose the most appropriate storage location (Fridge for perishables, Pantry for shelf-stable)
 6. Assign confidence:
-   - "high": Exact or near-exact match
-   - "medium": Close match but some uncertainty
-   - "low": Uncertain match
-   - "new": No reasonable match found in Grocy products
+   - "high": Exact or near-exact match to existing product
+   - "medium": Close match to existing product but some uncertainty
+   - "low": Uncertain match to existing product
+   - "new": **ONLY IF** absolutely no reasonable match exists in Grocy products
 
-IMPORTANT RULES:
+IMPORTANT MATCHING RULES:
+- **PRIORITIZE MATCHING TO EXISTING PRODUCTS** - only mark as "new" if truly no match exists
+- Match generically: "Olive Oil" matches "Olive Oil", "EVOO", "Extra Virgin Olive Oil", etc.
+- Match case-insensitively: "garlic" matches "Garlic"
+- Match singular/plural: "Onion" matches "Onions"
+- Common items like salt, pepper, garlic, onion, oil are almost certainly already in the system
+- If you see a common ingredient, search the Grocy product list carefully before marking as "new"
+
+OTHER RULES:
 - Convert units to {unit_preference} when possible (e.g., 1 gallon = 3.78 liters, 16 oz = 453 grams)
-- If no match found, set matched_product_id to null and confidence to "new"
 - Ignore non-food items (paper towels, cleaning supplies, etc.)
 - Combine duplicate items (e.g., "2 apples" and "3 apples" = 5 apples)
 - Use "count" as unit for whole items (eggs, apples, etc.)

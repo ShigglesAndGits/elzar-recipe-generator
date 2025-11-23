@@ -131,6 +131,42 @@ class GrocyClient:
             response.raise_for_status()
             return response.json()
     
+    async def create_location(self, name: str, description: str = "") -> Dict[str, Any]:
+        """
+        Create a new storage location in Grocy
+        
+        Args:
+            name: Location name (e.g., "Pantry", "Fridge")
+            description: Optional description
+        
+        Returns:
+            Created location details
+        """
+        body = {
+            "name": name,
+            "description": description,
+            "is_freezer": 1 if "freez" in name.lower() else 0
+        }
+        
+        async with httpx.AsyncClient() as client:
+            response = await client.post(
+                f"{self.base_url}/api/objects/locations",
+                headers=self.headers,
+                json=body,
+                timeout=30.0
+            )
+            
+            if response.status_code != 200:
+                try:
+                    error_data = response.json()
+                    error_msg = error_data.get('error_message', response.text)
+                except:
+                    error_msg = response.text or "Unknown error"
+                
+                raise Exception(f"Grocy API error: {response.status_code} - {error_msg}")
+            
+            return response.json()
+    
     async def get_quantity_units(self) -> List[Dict[str, Any]]:
         """Get all quantity units from Grocy"""
         async with httpx.AsyncClient() as client:

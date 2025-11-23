@@ -361,6 +361,75 @@ async def setup_unit_conversions():
         )
 
 
+@router.post("/grocy/setup-locations")
+async def setup_locations():
+    """
+    Set up basic storage locations in Grocy
+    
+    Creates:
+    - Pantry
+    - Fridge
+    
+    Returns:
+        Summary of locations created
+    """
+    config = await get_effective_config()
+    grocy_client = GrocyClient(config["grocy_url"], config["grocy_api_key"])
+    
+    results = {
+        "created": [],
+        "existing": [],
+        "failed": []
+    }
+    
+    try:
+        # Get existing locations
+        existing_locations = await grocy_client.get_locations()
+        existing_location_names = {loc["name"].lower() for loc in existing_locations}
+        
+        # Locations to create
+        locations_to_create = [
+            ("Pantry", "Dry goods and non-perishables"),
+            ("Fridge", "Refrigerated items")
+        ]
+        
+        for name, description in locations_to_create:
+            if name.lower() in existing_location_names:
+                results["existing"].append(name)
+                print(f"✓ Location '{name}' already exists")
+            else:
+                try:
+                    await grocy_client.create_location(name, description)
+                    results["created"].append(name)
+                    print(f"✓ Created location: {name}")
+                except Exception as e:
+                    error_msg = str(e)
+                    if "UNIQUE constraint failed" in error_msg:
+                        # Race condition - location was created between check and create
+                        results["existing"].append(name)
+                        print(f"ℹ️ Location '{name}' already exists")
+                    else:
+                        results["failed"].append({"name": name, "error": error_msg})
+                        print(f"❌ Failed to create location '{name}': {error_msg}")
+        
+        return {
+            "success": True,
+            "message": f"Created {len(results['created'])} locations, {len(results['existing'])} already existed",
+            "summary": {
+                "created": len(results["created"]),
+                "existing": len(results["existing"]),
+                "failed": len(results["failed"])
+            },
+            "details": results
+        }
+        
+    except Exception as e:
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=f"Failed to setup locations: {str(e)}"
+        )
+
+
 @router.get("/test/llm")
 async def test_llm_connection():
     """Test LLM API connection"""

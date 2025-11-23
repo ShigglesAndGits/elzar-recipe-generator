@@ -172,4 +172,9 @@ export const setupUnitConversions = async () => {
   return response.data;
 };
 
+export const setupLocations = async () => {
+  const response = await api.post('/api/settings/grocy/setup-locations');
+  return response.data;
+};
+
 export default api;

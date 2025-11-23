@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { getConfig, updateConfig, testGrocyConnection, testLLMConnection, setupUnitConversions } from '../api';
+import { getConfig, updateConfig, testGrocyConnection, testLLMConnection, setupUnitConversions, setupLocations } from '../api';
 
 function Settings() {
   const [config, setConfig] = useState(null);
@@ -19,6 +19,7 @@ function Settings() {
   
   // Unit conversion setup
   const [settingUpUnits, setSettingUpUnits] = useState(false);
+  const [settingUpLocations, setSettingUpLocations] = useState(false);
 
   useEffect(() => {
     loadConfig();
@@ -147,6 +148,39 @@ function Settings() {
       alert(err.response?.data?.detail || 'Failed to setup unit conversions');
     } finally {
       setSettingUpUnits(false);
+    }
+  };
+
+  const handleSetupLocations = async () => {
+    if (!confirm('This will create basic storage locations in Grocy (Pantry & Fridge). Continue?')) {
+      return;
+    }
+
+    setSettingUpLocations(true);
+    try {
+      const result = await setupLocations();
+      
+      let message = `✅ ${result.message}\n\n`;
+      message += `📊 Summary:\n`;
+      message += `• Locations created: ${result.summary.created}\n`;
+      message += `• Locations already existing: ${result.summary.existing}\n`;
+      
+      if (result.summary.failed > 0) {
+        message += `• Locations failed: ${result.summary.failed}\n`;
+      }
+      
+      if (result.details.created.length > 0) {
+        message += `\n✨ New locations: ${result.details.created.join(', ')}`;
+      }
+      if (result.details.existing.length > 0) {
+        message += `\n✓ Already existed: ${result.details.existing.join(', ')}`;
+      }
+      
+      alert(message);
+    } catch (err) {
+      alert(err.response?.data?.detail || 'Failed to setup locations');
+    } finally {
+      setSettingUpLocations(false);
     }
   };
 
@@ -575,6 +609,30 @@ function Settings() {
                 <li>...and many more!</li>
               </ul>
             </div>
+          </div>
+        </div>
+
+        {/* Location Setup */}
+        <div className="bg-gray-800 rounded-lg p-6 border border-gray-700">
+          <h3 className="text-xl font-semibold mb-4 text-white">📍 Storage Locations</h3>
+          <p className="text-gray-300 mb-4">
+            Set up basic storage locations in Grocy (Pantry & Fridge).
+          </p>
+          
+          <button
+            onClick={handleSetupLocations}
+            disabled={settingUpLocations}
+            className="w-full bg-gradient-to-r from-green-600 to-teal-600 hover:from-green-700 hover:to-teal-700 disabled:from-gray-600 disabled:to-gray-600 text-white font-semibold px-6 py-3 rounded-lg transition-all transform hover:scale-105"
+          >
+            {settingUpLocations ? '⏳ Setting up locations...' : '📦 Setup Storage Locations'}
+          </button>
+          
+          <div className="mt-4 text-xs text-gray-400">
+            <p className="font-semibold mb-2">Creates:</p>
+            <ul className="list-disc list-inside ml-2">
+              <li>Pantry (for dry goods and non-perishables)</li>
+              <li>Fridge (for refrigerated items)</li>
+            </ul>
           </div>
         </div>
 

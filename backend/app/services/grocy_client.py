@@ -393,6 +393,11 @@ class GrocyClient:
                 timeout=30.0
             )
             response.raise_for_status()
+            
+            # Grocy shopping list endpoint may return empty response
+            if response.status_code == 204 or not response.text:
+                return {"success": True, "product_id": product_id}
+            
             return response.json()
     
     async def create_recipe(

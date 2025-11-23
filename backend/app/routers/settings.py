@@ -77,13 +77,13 @@ async def get_config():
 @router.post("/config/update")
 async def update_core_config(update: CoreConfigUpdate):
     """
-    Update core configuration values by writing directly to .env file.
-    This ensures persistence across restarts.
+    Update core configuration values in the database.
+    These override environment variables and take effect immediately (no restart needed).
+    
+    Environment variables from .env or docker-compose serve as defaults.
+    Database settings override them at runtime.
     """
     try:
-        from pathlib import Path
-        import os
-        
         # Validate unit preference if provided
         if update.unit_preference is not None:
             if update.unit_preference not in ["metric", "imperial"]:
@@ -92,51 +92,34 @@ async def update_core_config(update: CoreConfigUpdate):
                     detail="unit_preference must be 'metric' or 'imperial'"
                 )
         
-        # Get current config to preserve unmodified values
-        config = await get_effective_config()
-        
-        # Update with new values (only if provided and not masked)
+        # Save to database (only if provided and not masked)
         if update.grocy_url is not None:
-            config["grocy_url"] = update.grocy_url
+            await db.set_setting("grocy_url", update.grocy_url)
+        
         if update.grocy_api_key is not None and update.grocy_api_key != "***":
-            config["grocy_api_key"] = update.grocy_api_key
+            await db.set_setting("grocy_api_key", update.grocy_api_key)
+            
         if update.llm_api_url is not None:
-            config["llm_api_url"] = update.llm_api_url
+            await db.set_setting("llm_api_url", update.llm_api_url)
+            
         if update.llm_api_key is not None and update.llm_api_key != "***":
-            config["llm_api_key"] = update.llm_api_key
+            await db.set_setting("llm_api_key", update.llm_api_key)
+            
         if update.llm_model is not None:
-            config["llm_model"] = update.llm_model
+            await db.set_setting("llm_model", update.llm_model)
+            
         if update.max_recipe_history is not None:
-            config["max_recipe_history"] = update.max_recipe_history
+            await db.set_setting("max_recipe_history", str(update.max_recipe_history))
+            
         if update.apprise_url is not None:
-            config["apprise_url"] = update.apprise_url
+            await db.set_setting("apprise_url", update.apprise_url)
+        
         if update.unit_preference is not None:
-            config["unit_preference"] = update.unit_preference
-        
-        # Write to .env file
-        # Path: routers/settings.py -> routers/ -> app/ -> backend/ -> .env
-        env_path = Path(__file__).parent.parent.parent / ".env"
-        
-        env_content = f"""GROCY_URL={config['grocy_url']}
-GROCY_API_KEY={config['grocy_api_key']}
-LLM_API_URL={config['llm_api_url']}
-LLM_API_KEY={config['llm_api_key']}
-LLM_MODEL={config['llm_model']}
-MAX_RECIPE_HISTORY={config['max_recipe_history']}
-DATABASE_PATH={config.get('database_path', '../data/recipes.db')}
-RECIPE_EXPORT_PATH={config.get('recipe_export_path', '../data/recipes')}
-APPRISE_URL={config.get('apprise_url', '')}
-BACKEND_HOST={config.get('backend_host', '0.0.0.0')}
-BACKEND_PORT={config.get('backend_port', 8000)}
-UNIT_PREFERENCE={config.get('unit_preference', 'metric')}
-"""
-        
-        with open(env_path, 'w') as f:
-            f.write(env_content)
-        
+            await db.set_setting("unit_preference", update.unit_preference)
+            
         return {
             "status": "success", 
-            "message": "Configuration saved to .env file. Restart backend to apply changes."
+            "message": "Configuration updated successfully! Changes take effect immediately."
         }
         
     except Exception as e:

@@ -254,7 +254,6 @@ class GrocyClient:
             "qu_id_purchase": qu_id_purchase or qu_id_stock,
             "qu_id_consume": qu_id_stock,  # Same as stock unit
             "qu_id_price": qu_id_stock,  # Same as stock unit
-            "qu_factor_purchase_to_stock": 1,
             "min_stock_amount": min_stock_amount,
             "default_best_before_days": 0,
             "product_group_id": None,

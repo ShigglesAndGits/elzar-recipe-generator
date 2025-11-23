@@ -188,7 +188,7 @@ Return ONLY a valid JSON array with NO additional text or explanation:
             else "Use imperial purchasing units (lb, gal, qt) for quantities."
         )
         
-        prompt = f"""You are a shopping list assistant. Extract ingredients from this recipe and convert them to REALISTIC PURCHASING QUANTITIES.
+        prompt = f"""You are a shopping list assistant. Extract ingredients from this recipe and convert them to REALISTIC PURCHASING QUANTITIES using STANDARD UNITS ONLY.
 
 RECIPE TEXT:
 {recipe_text}
@@ -202,25 +202,33 @@ CURRENT STOCK LEVELS:
 TASK:
 For each ingredient in the recipe:
 1. Extract ingredient name (normalized to match Grocy products)
-2. **CONVERT to realistic purchasing quantity**:
-   - Example: "2 tablespoons olive oil" → 1 bottle (750ml or 25 fl oz)
-   - Example: "1 teaspoon salt" → 1 container (500g or 1 lb)
-   - Example: "1/2 cup flour" → 1 bag (1kg or 2 lb)
-   - Example: "1 cup milk" → 1 carton (1l or 1 qt)
-   - **NEVER use teaspoons, tablespoons, or cups as purchasing units**
-   - Think: "What would I actually buy at the store?"
-3. Use realistic purchasing units. {unit_guidance}
+2. **CONVERT to realistic purchasing quantity using STANDARD UNITS**:
+   - Metric: g, kg, ml, l ONLY
+   - Imperial: oz, lb, fl oz, pt, qt, gal ONLY
+   - **NEVER use: bottle, box, bag, container, package, can, jar**
+   - **NEVER use: teaspoon, tablespoon, cup (too small for shopping)**
+   - Think: "What quantity would I actually buy at the store?"
+3. Round up to common store package sizes. {unit_guidance}
 4. Match to EXISTING Grocy product whenever possible
 5. Check if in stock and if quantity is sufficient
 6. Assign confidence (high/medium/low/new)
 
-**PURCHASING UNIT GUIDELINES:**
-- Spices/seasonings: 1 container (100g or 4 oz minimum)
-- Oils: 1 bottle (500ml-1l or 16-32 fl oz)
-- Flour/sugar: 1 bag (1-2 kg or 2-5 lb)
-- Milk/liquids: 1 carton/bottle (1l or 1 qt minimum)
-- Cheese: 1 package (200-500g or 8-16 oz)
-- Produce: 1 unit or 1 bunch
+**PURCHASING QUANTITY EXAMPLES:**
+METRIC:
+- "2 tbsp olive oil" → 750 ml (standard bottle)
+- "1 tsp salt" → 500 g (standard container)
+- "1/2 cup flour" → 1 kg (small bag)
+- "1 cup milk" → 1 l (carton)
+- "2 oz cheese" → 250 g (package)
+- "1 clove garlic" → 100 g (bulb)
+
+IMPERIAL:
+- "2 tbsp olive oil" → 25 fl oz (standard bottle)
+- "1 tsp salt" → 1 lb (standard container)
+- "1/2 cup flour" → 2 lb (small bag)
+- "1 cup milk" → 1 qt (carton)
+- "2 oz cheese" → 8 oz (package)
+- "1 clove garlic" → 4 oz (bulb)
 
 Return ONLY a valid JSON array with NO additional text:
 [

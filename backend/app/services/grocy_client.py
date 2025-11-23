@@ -248,23 +248,38 @@ class GrocyClient:
         """
         body = {
             "name": name,
-            "description": description,
+            "description": description or name,
             "location_id": location_id,
             "qu_id_stock": qu_id_stock,
             "qu_id_purchase": qu_id_purchase or qu_id_stock,
+            "qu_id_consume": qu_id_stock,  # Same as stock unit
+            "qu_id_price": qu_id_stock,  # Same as stock unit
             "qu_factor_purchase_to_stock": 1,
-            "min_stock_amount": min_stock_amount
+            "min_stock_amount": min_stock_amount,
+            "default_best_before_days": 0,
+            "product_group_id": None,
+            "active": 1,
+            "calories": 0,
+            "quick_consume_amount": 1,
+            "due_type": 1,  # Best before date
+            "treat_opened_as_out_of_stock": 1
         }
         
         async with httpx.AsyncClient() as client:
-            response = await client.post(
-                f"{self.base_url}/api/objects/products",
-                headers=self.headers,
-                json=body,
-                timeout=30.0
-            )
-            response.raise_for_status()
-            return response.json()
+            try:
+                response = await client.post(
+                    f"{self.base_url}/api/objects/products",
+                    headers=self.headers,
+                    json=body,
+                    timeout=30.0
+                )
+                response.raise_for_status()
+                return response.json()
+            except httpx.HTTPStatusError as e:
+                # Log the error details for debugging
+                error_detail = f"Grocy API error: {e.response.status_code} - {e.response.text}"
+                print(f"❌ Failed to create product '{name}': {error_detail}")
+                raise Exception(error_detail)
     
     async def add_to_shopping_list(
         self, 

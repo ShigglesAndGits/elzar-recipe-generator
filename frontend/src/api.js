@@ -152,4 +152,9 @@ export const saveRecipeToGrocy = async (recipeId) => {
   return response.data;
 };
 
+export const parseRecipeIngredients = async (recipeId) => {
+  const response = await api.post(`/api/recipes/${recipeId}/parse-ingredients`);
+  return response.data;
+};
+
 export default api;

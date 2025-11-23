@@ -347,6 +347,108 @@ async def send_recipe_notification(recipe_id: int, notification: NotificationReq
         )
 
 
+@router.post("/{recipe_id}/parse-ingredients")
+async def parse_recipe_ingredients(recipe_id: int):
+    """
+    Parse recipe ingredients and match them to Grocy products.
+    Returns parsed items for user review before taking action.
+    
+    Similar to inventory parsing, this allows users to:
+    - Review matched items
+    - Create missing products
+    - Adjust quantities/units
+    - Then proceed with consume/shopping list/save actions
+    """
+    config = await get_effective_config()
+    
+    # Get recipe
+    recipe = await db.get_recipe(recipe_id)
+    if not recipe:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Recipe not found"
+        )
+    
+    # Initialize clients
+    grocy_client = GrocyClient(config["grocy_url"], config["grocy_api_key"])
+    matcher = InventoryMatcher(
+        config["llm_api_url"],
+        config["llm_api_key"],
+        config["llm_model"]
+    )
+    
+    try:
+        # Get Grocy data
+        products = await grocy_client.get_products()
+        locations = await grocy_client.get_locations()
+        quantity_units = await grocy_client.get_quantity_units()
+        stock_info = await grocy_client.format_inventory_for_llm()
+        unit_preference = config.get("unit_preference", "metric")
+        
+        # Extract and match ingredients using LLM
+        ingredients = await matcher.extract_recipe_ingredients(
+            recipe["recipe_text"],
+            products,
+            stock_info,
+            unit_preference
+        )
+        
+        # Format as ParsedItems (same structure as inventory parser)
+        from ..models import ParsedItem
+        
+        product_name_to_id = {p["name"].lower(): p["id"] for p in products}
+        location_name_to_id = {loc["name"].lower(): loc["id"] for loc in locations}
+        unit_name_to_id = {unit["name"].lower(): unit["id"] for unit in quantity_units}
+        
+        parsed_items = []
+        for ing in ingredients:
+            product_id = ing.get("product_id")
+            product_name = ing.get("product_name", "")
+            
+            # Determine confidence
+            if product_id:
+                confidence = "high" if ing.get("in_stock") else "medium"
+            else:
+                confidence = "new"
+            
+            # Get location and unit IDs
+            location_id = None
+            if product_id:
+                # Get location from existing product
+                product = next((p for p in products if p["id"] == product_id), None)
+                if product:
+                    location_id = product.get("location_id")
+            
+            # Guess location for new products
+            if not location_id and locations:
+                # Default to first location (usually Pantry or Fridge)
+                location_id = locations[0]["id"]
+            
+            # Get unit ID
+            unit_str = ing.get("unit", "").lower()
+            quantity_unit_id = unit_name_to_id.get(unit_str, 2)  # Default to Piece
+            
+            parsed_items.append(ParsedItem(
+                original_text=ing.get("ingredient_text", ""),
+                item_name=product_name or ing.get("ingredient_text", ""),
+                quantity=ing.get("quantity", 1.0),
+                unit=ing.get("unit", "unit"),
+                grocy_product_id=product_id,
+                grocy_product_name=product_name if product_id else None,
+                confidence=confidence,
+                location_id=location_id,
+                quantity_unit_id=quantity_unit_id
+            ))
+        
+        return {"parsed_items": parsed_items}
+        
+    except Exception as e:
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=f"Error parsing recipe ingredients: {str(e)}"
+        )
+
+
 @router.post("/{recipe_id}/consume-ingredients")
 async def consume_recipe_ingredients(recipe_id: int):
     """
@@ -646,7 +748,8 @@ async def save_recipe_to_grocy(recipe_id: int):
                 continue
             
             # Get quantity unit ID
-            qu_id = unit_lookup.get(ingredient["unit"].lower(), 1)
+            unit_str = ingredient.get("unit", "").lower() if ingredient.get("unit") else "unit"
+            qu_id = unit_lookup.get(unit_str, 2)  # Default to Piece
             
             try:
                 await grocy_client.add_recipe_ingredient(

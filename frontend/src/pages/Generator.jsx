@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import ReactMarkdown from 'react-markdown';
 import GrocyActionModal from '../components/GrocyActionModal';
+import RecipeIngredientReview from '../components/RecipeIngredientReview';
 import { 
   generateRecipe, 
   regenerateRecipe, 
@@ -9,7 +10,8 @@ import {
   sendRecipeNotification,
   consumeRecipeIngredients,
   addMissingToShoppingList,
-  saveRecipeToGrocy
+  saveRecipeToGrocy,
+  parseRecipeIngredients
 } from '../api';
 
 const CUISINES = [
@@ -52,6 +54,11 @@ function Generator() {
   const [modalTitle, setModalTitle] = useState('');
   const [modalResults, setModalResults] = useState(null);
   const [modalActionType, setModalActionType] = useState(null);
+
+  // Review modal state
+  const [reviewOpen, setReviewOpen] = useState(false);
+  const [reviewParsedItems, setReviewParsedItems] = useState(null);
+  const [reviewActionType, setReviewActionType] = useState(null);
 
   // Load profiles on mount
   useEffect(() => {
@@ -161,20 +168,17 @@ function Generator() {
   const handleConsumeIngredients = async () => {
     if (!currentRecipe) return;
 
-    if (!confirm('This will consume the recipe ingredients from your Grocy stock. Continue?')) {
-      return;
-    }
-
     try {
-      const result = await consumeRecipeIngredients(currentRecipe.id);
+      // Parse ingredients first
+      const parsed = await parseRecipeIngredients(currentRecipe.id);
       
-      setModalTitle('Consume Recipe Ingredients');
-      setModalResults(result);
-      setModalActionType('consume');
-      setModalOpen(true);
+      // Show review modal
+      setReviewParsedItems(parsed.parsed_items);
+      setReviewActionType('consume');
+      setReviewOpen(true);
     } catch (err) {
-      console.error('Consume error:', err);
-      alert(err.response?.data?.detail || 'Failed to consume ingredients');
+      console.error('Parse error:', err);
+      alert(err.response?.data?.detail || 'Failed to parse ingredients');
     }
   };
 
@@ -182,35 +186,33 @@ function Generator() {
     if (!currentRecipe) return;
 
     try {
-      const result = await addMissingToShoppingList(currentRecipe.id);
+      // Parse ingredients first
+      const parsed = await parseRecipeIngredients(currentRecipe.id);
       
-      setModalTitle('Add Missing Ingredients to Shopping List');
-      setModalResults(result);
-      setModalActionType('shopping');
-      setModalOpen(true);
+      // Show review modal
+      setReviewParsedItems(parsed.parsed_items);
+      setReviewActionType('shopping');
+      setReviewOpen(true);
     } catch (err) {
-      console.error('Shopping list error:', err);
-      alert(err.response?.data?.detail || 'Failed to add to shopping list');
+      console.error('Parse error:', err);
+      alert(err.response?.data?.detail || 'Failed to parse ingredients');
     }
   };
 
   const handleSaveRecipeToGrocy = async () => {
     if (!currentRecipe) return;
 
-    if (!confirm('This will save the recipe to Grocy with linked ingredients. Continue?')) {
-      return;
-    }
-
     try {
-      const result = await saveRecipeToGrocy(currentRecipe.id);
+      // Parse ingredients first
+      const parsed = await parseRecipeIngredients(currentRecipe.id);
       
-      setModalTitle('Save Recipe to Grocy');
-      setModalResults(result);
-      setModalActionType('save');
-      setModalOpen(true);
+      // Show review modal
+      setReviewParsedItems(parsed.parsed_items);
+      setReviewActionType('save');
+      setReviewOpen(true);
     } catch (err) {
-      console.error('Save recipe error:', err);
-      alert(err.response?.data?.detail || 'Failed to save recipe to Grocy');
+      console.error('Parse error:', err);
+      alert(err.response?.data?.detail || 'Failed to parse ingredients');
     }
   };
 
@@ -528,6 +530,29 @@ function Generator() {
         title={modalTitle}
         results={modalResults}
         actionType={modalActionType}
+      />
+
+      {/* Recipe Ingredient Review Modal */}
+      <RecipeIngredientReview
+        isOpen={reviewOpen}
+        onClose={() => {
+          setReviewOpen(false);
+          setReviewParsedItems(null);
+        }}
+        recipeId={currentRecipe?.id}
+        parsedItems={reviewParsedItems}
+        actionType={reviewActionType}
+        onComplete={(result) => {
+          setReviewOpen(false);
+          setModalTitle(
+            reviewActionType === 'consume' ? 'Consume Recipe Ingredients' :
+            reviewActionType === 'shopping' ? 'Add Missing to Shopping List' :
+            'Save Recipe to Grocy'
+          );
+          setModalResults(result);
+          setModalActionType(reviewActionType);
+          setModalOpen(true);
+        }}
       />
     </div>
   );

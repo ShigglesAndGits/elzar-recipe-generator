@@ -947,14 +947,22 @@ async def save_recipe_to_grocy_reviewed(recipe_id: int, request: InventoryAction
             
             if product_id:
                 # Use the product's stock quantity unit to avoid conversion errors
-                qu_id = product_units.get(product_id, 1)
+                qu_id = product_units.get(product_id)
                 
-                # Update product_units if we just created this product
-                if product_id not in product_units:
+                # If we don't have the unit (newly created product), refresh the list
+                if qu_id is None:
                     # Refresh product list
                     all_products = await grocy_client.get_products()
-                    product_units = {p["id"]: p.get("qu_id_stock", 1) for p in all_products}
-                    qu_id = product_units.get(product_id, 1)
+                    product_units = {p["id"]: p.get("qu_id_stock") for p in all_products}
+                    qu_id = product_units.get(product_id)
+                
+                # If still no unit found, skip this ingredient with a helpful error
+                if qu_id is None:
+                    results["ingredients_skipped"].append({
+                        "ingredient": item.product_name,
+                        "reason": f"Product ID {product_id} has no stock unit defined in Grocy"
+                    })
+                    continue
                 
                 processed_ingredients.append({
                     "product_id": product_id,

@@ -45,6 +45,7 @@ class LLMClient:
         elzar_voice = request_params.get("elzar_voice", True)
         servings = request_params.get("servings", "3-4")
         high_leftover_potential = request_params.get("high_leftover_potential", False)
+        unit_preference = request_params.get("unit_preference", "imperial")
         
         # Build the prompt
         prompt_parts = []

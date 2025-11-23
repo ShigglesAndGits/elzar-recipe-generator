@@ -209,16 +209,22 @@ CURRENT STOCK LEVELS:
 TASK:
 For each ingredient in the recipe:
 1. Extract ingredient name (normalized to match Grocy products)
-2. **CONVERT to realistic purchasing quantity using STANDARD UNITS**:
+2. **CHECK CURRENT STOCK** - Compare recipe needs vs available stock
+3. **ONLY INCLUDE items that are MISSING or INSUFFICIENT**:
+   - If item is NOT in stock → Include it
+   - If item is in stock but quantity is LESS than needed → Include it
+   - If item is in stock with SUFFICIENT quantity → DO NOT include it
+4. **CONVERT to realistic purchasing quantity using STANDARD UNITS**:
    - Metric: g, kg, ml, l ONLY
    - Imperial: oz, lb, fl oz, pt, qt, gal ONLY
    - **NEVER use: bottle, box, bag, container, package, can, jar**
    - **NEVER use: teaspoon, tablespoon, cup (too small for shopping)**
    - Think: "What quantity would I actually buy at the store?"
-3. Round up to common store package sizes. {unit_guidance}
-4. Match to EXISTING Grocy product whenever possible
-5. Check if in stock and if quantity is sufficient
-6. Assign confidence (high/medium/low/new)
+5. Round up to common store package sizes. {unit_guidance}
+6. Match to EXISTING Grocy product whenever possible
+7. Assign confidence (high/medium/low/new)
+
+**CRITICAL**: If ALL ingredients are already in stock with sufficient quantities, return an EMPTY array []
 
 **PURCHASING QUANTITY EXAMPLES:**
 METRIC:

@@ -189,6 +189,12 @@ function Generator() {
       // Parse ingredients first - use shopping mode for realistic quantities
       const parsed = await parseRecipeIngredients(currentRecipe.id, 'shopping');
       
+      // Check if there are any items to add
+      if (!parsed.parsed_items || parsed.parsed_items.length === 0) {
+        alert('🎉 Great news! All ingredients are already in stock with sufficient quantities. Nothing to add to the shopping list!');
+        return;
+      }
+      
       // Show review modal
       setReviewParsedItems(parsed.parsed_items);
       setReviewActionType('shopping');

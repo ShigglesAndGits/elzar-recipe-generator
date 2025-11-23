@@ -1,6 +1,15 @@
 import React, { useState, useEffect } from 'react';
 import ReactMarkdown from 'react-markdown';
-import { generateRecipe, regenerateRecipe, getAllProfiles, downloadRecipe, sendRecipeNotification } from '../api';
+import { 
+  generateRecipe, 
+  regenerateRecipe, 
+  getAllProfiles, 
+  downloadRecipe, 
+  sendRecipeNotification,
+  consumeRecipeIngredients,
+  addMissingToShoppingList,
+  saveRecipeToGrocy
+} from '../api';
 
 const CUISINES = [
   'No Preference',
@@ -139,6 +148,83 @@ function Generator() {
     } catch (err) {
       console.error('Notification error:', err);
       alert(err.response?.data?.detail || 'Failed to send notification. Check your settings.');
+    }
+  };
+
+  const handleConsumeIngredients = async () => {
+    if (!currentRecipe) return;
+
+    if (!confirm('This will consume the recipe ingredients from your Grocy stock. Continue?')) {
+      return;
+    }
+
+    try {
+      const result = await consumeRecipeIngredients(currentRecipe.id);
+      
+      let message = `✓ Consumed ${result.consumed.length} ingredients\n`;
+      if (result.insufficient_stock.length > 0) {
+        message += `⚠ ${result.insufficient_stock.length} items had insufficient stock\n`;
+      }
+      if (result.skipped.length > 0) {
+        message += `⚠ Skipped ${result.skipped.length} items`;
+      }
+      
+      alert(message);
+    } catch (err) {
+      console.error('Consume error:', err);
+      alert(err.response?.data?.detail || 'Failed to consume ingredients');
+    }
+  };
+
+  const handleAddMissingToShoppingList = async () => {
+    if (!currentRecipe) return;
+
+    try {
+      const result = await addMissingToShoppingList(currentRecipe.id);
+      
+      if (result.added.length === 0) {
+        alert('All ingredients are already in stock! 🎉');
+      } else {
+        let message = `✓ Added ${result.added.length} items to shopping list\n\n`;
+        message += result.added.map(item => 
+          `• ${item.product_name}: ${item.quantity} ${item.unit}`
+        ).join('\n');
+        
+        if (result.skipped.length > 0) {
+          message += `\n\n⚠ Skipped ${result.skipped.length} items (no product match)`;
+        }
+        
+        alert(message);
+      }
+    } catch (err) {
+      console.error('Shopping list error:', err);
+      alert(err.response?.data?.detail || 'Failed to add to shopping list');
+    }
+  };
+
+  const handleSaveRecipeToGrocy = async () => {
+    if (!currentRecipe) return;
+
+    if (!confirm('This will save the recipe to Grocy with linked ingredients. Continue?')) {
+      return;
+    }
+
+    try {
+      const result = await saveRecipeToGrocy(currentRecipe.id);
+      
+      let message = `✓ Recipe saved to Grocy!\n`;
+      message += `Recipe: ${result.recipe_name}\n`;
+      message += `Servings: ${result.servings}\n`;
+      message += `Ingredients: ${result.ingredients_added.length} added`;
+      
+      if (result.ingredients_skipped.length > 0) {
+        message += `\n⚠ ${result.ingredients_skipped.length} ingredients skipped (no match)`;
+      }
+      
+      alert(message);
+    } catch (err) {
+      console.error('Save recipe error:', err);
+      alert(err.response?.data?.detail || 'Failed to save recipe to Grocy');
     }
   };
 
@@ -378,6 +464,31 @@ function Generator() {
                   >
                     📱 Send to Phone
                   </button>
+                </div>
+
+                {/* Grocy Integration Buttons */}
+                <div className="border-t border-gray-700 pt-2 mt-2">
+                  <p className="text-xs text-gray-400 mb-2">Grocy Integration</p>
+                  <div className="space-y-2">
+                    <button
+                      onClick={handleConsumeIngredients}
+                      className="w-full bg-purple-600 hover:bg-purple-700 text-white font-semibold py-2 px-4 rounded-lg transition-colors text-sm"
+                    >
+                      🍽️ Consume Ingredients
+                    </button>
+                    <button
+                      onClick={handleAddMissingToShoppingList}
+                      className="w-full bg-cyan-600 hover:bg-cyan-700 text-white font-semibold py-2 px-4 rounded-lg transition-colors text-sm"
+                    >
+                      🛒 Add Missing to Shopping List
+                    </button>
+                    <button
+                      onClick={handleSaveRecipeToGrocy}
+                      className="w-full bg-indigo-600 hover:bg-indigo-700 text-white font-semibold py-2 px-4 rounded-lg transition-colors text-sm"
+                    >
+                      💾 Save Recipe to Grocy
+                    </button>
+                  </div>
                 </div>
               </>
             )}

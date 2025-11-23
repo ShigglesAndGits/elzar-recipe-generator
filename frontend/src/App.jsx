@@ -4,6 +4,7 @@ import Generator from './pages/Generator';
 import History from './pages/History';
 import Profiles from './pages/Profiles';
 import Settings from './pages/Settings';
+import InventoryManager from './pages/InventoryManager';
 import './index.css';
 
 function Navigation() {
@@ -62,6 +63,9 @@ function Navigation() {
           <Link to="/" className={navClasses('/')}>
             Generator
           </Link>
+          <Link to="/inventory" className={navClasses('/inventory')}>
+            Inventory
+          </Link>
           <Link to="/history" className={navClasses('/history')}>
             History
           </Link>
@@ -85,6 +89,7 @@ function App() {
         <main className="container mx-auto px-4 py-6">
           <Routes>
             <Route path="/" element={<Generator />} />
+            <Route path="/inventory" element={<InventoryManager />} />
             <Route path="/history" element={<History />} />
             <Route path="/profiles" element={<Profiles />} />
             <Route path="/settings" element={<Settings />} />

@@ -115,4 +115,41 @@ export const testLLMConnection = async () => {
   return response.data;
 };
 
+// Inventory APIs (v1.1)
+export const parseInventoryText = async (text, actionType) => {
+  const response = await api.post('/api/inventory/parse', { text, action_type: actionType });
+  return response.data;
+};
+
+export const purchaseItems = async (items) => {
+  const response = await api.post('/api/inventory/purchase', { items });
+  return response.data;
+};
+
+export const consumeItems = async (items) => {
+  const response = await api.post('/api/inventory/consume', { items });
+  return response.data;
+};
+
+export const createProducts = async (products) => {
+  const response = await api.post('/api/inventory/create-products', products);
+  return response.data;
+};
+
+// Recipe Integration APIs (v1.1)
+export const consumeRecipeIngredients = async (recipeId) => {
+  const response = await api.post(`/api/recipes/${recipeId}/consume-ingredients`);
+  return response.data;
+};
+
+export const addMissingToShoppingList = async (recipeId) => {
+  const response = await api.post(`/api/recipes/${recipeId}/add-missing-to-shopping-list`);
+  return response.data;
+};
+
+export const saveRecipeToGrocy = async (recipeId) => {
+  const response = await api.post(`/api/recipes/${recipeId}/save-to-grocy`);
+  return response.data;
+};
+
 export default api;

@@ -92,17 +92,17 @@ async def update_core_config(update: CoreConfigUpdate):
                     detail="unit_preference must be 'metric' or 'imperial'"
                 )
         
-        # Save to database (only if provided and not masked)
-        if update.grocy_url is not None:
+        # Save to database (only if provided and not masked/empty)
+        if update.grocy_url is not None and update.grocy_url.strip():
             await db.set_setting("grocy_url", update.grocy_url)
         
-        if update.grocy_api_key is not None and update.grocy_api_key != "***":
+        if update.grocy_api_key is not None and update.grocy_api_key != "***" and update.grocy_api_key.strip():
             await db.set_setting("grocy_api_key", update.grocy_api_key)
             
-        if update.llm_api_url is not None:
+        if update.llm_api_url is not None and update.llm_api_url.strip():
             await db.set_setting("llm_api_url", update.llm_api_url)
             
-        if update.llm_api_key is not None and update.llm_api_key != "***":
+        if update.llm_api_key is not None and update.llm_api_key != "***" and update.llm_api_key.strip():
             await db.set_setting("llm_api_key", update.llm_api_key)
             
         if update.llm_model is not None:

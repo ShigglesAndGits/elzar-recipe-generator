@@ -64,6 +64,9 @@ async def generate_recipe(request: RecipeGenerationRequest):
             "calories_per_serving": request.calories_per_serving,
             "use_external_ingredients": request.use_external_ingredients,
             "prioritize_expiring": request.prioritize_expiring,
+            "elzar_voice": request.elzar_voice,
+            "servings": request.servings,
+            "high_leftover_potential": request.high_leftover_potential,
             "user_prompt": request.user_prompt
         }
         

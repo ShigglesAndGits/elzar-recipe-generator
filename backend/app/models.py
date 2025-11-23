@@ -14,6 +14,9 @@ class RecipeGenerationRequest(BaseModel):
     dish_preference: str = "I don't care"  # No dishes, Few dishes, I don't care
     calories_per_serving: Optional[int] = None
     use_external_ingredients: bool = False
+    elzar_voice: bool = True
+    servings: str = "3-4"  # 1-2, 3-4, 5-6, 7+
+    high_leftover_potential: bool = False
     user_prompt: Optional[str] = None  # Additional user notes
 
 

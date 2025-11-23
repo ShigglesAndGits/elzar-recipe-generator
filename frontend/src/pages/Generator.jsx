@@ -27,6 +27,9 @@ function Generator() {
   const [dishPreference, setDishPreference] = useState("I don't care");
   const [caloriesPerServing, setCaloriesPerServing] = useState('');
   const [useExternalIngredients, setUseExternalIngredients] = useState(false);
+  const [elzarVoice, setElzarVoice] = useState(true);
+  const [servings, setServings] = useState('3-4');
+  const [highLeftoverPotential, setHighLeftoverPotential] = useState(false);
   const [userPrompt, setUserPrompt] = useState('');
 
   // Recipe state
@@ -70,6 +73,9 @@ function Generator() {
         dish_preference: dishPreference,
         calories_per_serving: caloriesPerServing ? parseInt(caloriesPerServing) : null,
         use_external_ingredients: useExternalIngredients,
+        elzar_voice: elzarVoice,
+        servings,
+        high_leftover_potential: highLeftoverPotential,
         user_prompt: userPrompt || null,
       };
 
@@ -146,6 +152,17 @@ function Generator() {
             Recipe Controls
           </h2>
 
+          <button
+            onClick={() => setElzarVoice(!elzarVoice)}
+            className={`w-full mb-6 py-3 px-4 rounded-lg font-bold text-lg flex items-center justify-center transition-colors shadow-md ${
+              elzarVoice
+                ? 'bg-gradient-to-r from-purple-600 to-elzar-red text-white ring-2 ring-elzar-red'
+                : 'bg-gray-700 text-gray-400 hover:bg-gray-600'
+            }`}
+          >
+            {elzarVoice ? '🌶️ Hit it with the spice weasel! (ON)' : '🧂 Spice Weasel: OFF'}
+          </button>
+
           {/* Cuisine */}
           <div className="mb-4">
             <label className="block text-sm font-medium mb-2">Cuisine</label>
@@ -205,6 +222,16 @@ function Generator() {
               />
               <span>Use ingredients not in fridge</span>
             </label>
+
+            <label className="flex items-center space-x-2 cursor-pointer">
+              <input
+                type="checkbox"
+                checked={highLeftoverPotential}
+                onChange={(e) => setHighLeftoverPotential(e.target.checked)}
+                className="w-5 h-5 rounded"
+              />
+              <span>High leftover potential</span>
+            </label>
           </div>
 
           {/* Time Slider */}
@@ -242,6 +269,26 @@ function Generator() {
                   }`}
                 >
                   {level}
+                </button>
+              ))}
+            </div>
+          </div>
+
+          {/* Servings */}
+          <div className="mb-4">
+            <label className="block text-sm font-medium mb-2">Servings</label>
+            <div className="grid grid-cols-4 gap-2">
+              {['1-2', '3-4', '5-6', '7+'].map((s) => (
+                <button
+                  key={s}
+                  onClick={() => setServings(s)}
+                  className={`px-2 py-2 rounded-lg transition-colors text-sm font-medium ${
+                    servings === s
+                      ? 'bg-blue-600 text-white'
+                      : 'bg-gray-700 text-gray-300 hover:bg-gray-600'
+                  }`}
+                >
+                  {s}
                 </button>
               ))}
             </div>

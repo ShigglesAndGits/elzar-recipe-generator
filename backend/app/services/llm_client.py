@@ -41,14 +41,27 @@ class LLMClient:
         prioritize_expiring = request_params.get("prioritize_expiring", False)
         user_prompt = request_params.get("user_prompt", "")
         
+        # New parameters
+        elzar_voice = request_params.get("elzar_voice", True)
+        servings = request_params.get("servings", "3-4")
+        high_leftover_potential = request_params.get("high_leftover_potential", False)
+        
         # Build the prompt
-        prompt_parts = [
-            "You are Elzar, an expert chef AI assistant! BAM! 🌶️",
+        prompt_parts = []
+        
+        if elzar_voice:
+            prompt_parts.append("You are Elzar, an expert chef AI assistant! BAM! 🌶️")
+            prompt_parts.append("You should speak in the voice of Elzar from Futurama (enthusiastic, using phrases like 'BAM!', 'Kick it up a notch', 'Spice Weasel').")
+        else:
+            prompt_parts.append("You are a professional chef AI assistant.")
+            prompt_parts.append("Provide ONLY the recipe details. Calorie count, ingredients list, and instructions. NO fluff, NO conversational filler, NO intro/outro text.")
+            
+        prompt_parts.extend([
             "",
-            "Generate a delicious recipe based on the following information:",
+            "Generate a recipe based on the following information:",
             "",
             "AVAILABLE INGREDIENTS:"
-        ]
+        ])
         
         # Add available items
         if inventory.get("available_items"):
@@ -65,6 +78,13 @@ class LLMClient:
         prompt_parts.append(f"- Maximum cooking time: {time_minutes} minutes")
         prompt_parts.append(f"- Effort level: {effort_level}")
         prompt_parts.append(f"- Dish cleanup preference: {dish_preference}")
+        prompt_parts.append(f"- Servings: {servings}")
+        
+        if servings == "7+":
+            prompt_parts.append("  (This is a large batch for food prep. Scale ingredients accordingly.)")
+            
+        if high_leftover_potential:
+            prompt_parts.append("- High Leftover Potential: Ensure this recipe stores well and makes for good leftovers.")
         
         if calories:
             prompt_parts.append(f"- Target calories per serving: approximately {calories}")
@@ -106,26 +126,33 @@ class LLMClient:
         # Instructions for output format
         prompt_parts.extend([
             "",
-            "Please generate a detailed recipe in markdown format including:",
-            "- Recipe title",
-            "- Prep time and cook time",
-            "- Number of servings",
-            "- Ingredients list with quantities",
-            "- Step-by-step instructions",
-            "- Estimated calories per serving (if possible)",
-            "- Any relevant cooking tips",
+            "OUTPUT FORMAT:",
+            "1. FIRST LINE MUST BE: **Calories:** [count] | **Servings:** [count] | **Prep Time:** [time]",
+            "2. Then, the Recipe Title",
+            "3. Ingredients list with quantities - SEPARATE into two subsections: 'From Pantry' (items from available list) and 'Missing / To Buy' (items not in inventory)",
+            "4. Step-by-step instructions",
+            "5. Any relevant cooking tips",
+            ""
+        ])
+        
+        if not elzar_voice:
+             prompt_parts.append("REMEMBER: No conversational filler. Just the facts.")
+             
+        prompt_parts.extend([
             "",
-            "At the end, include metadata in this exact format:",
+            "At the VERY end, include metadata in this exact format:",
             "---",
             "METADATA:",
             "Cuisine: [the cuisine type]",
             "Total Time: [number in minutes]",
             "Effort: [Low/Medium/High]",
             "Calories: [number per serving]",
-            "---",
-            "",
-            "BAM! Let's make something delicious! 🌶️"
+            "---"
         ])
+        
+        if elzar_voice:
+             prompt_parts.append("")
+             prompt_parts.append("BAM! Let's make something delicious! 🌶️")
         
         return "\n".join(prompt_parts)
     
@@ -232,4 +259,3 @@ class LLMClient:
             raise Exception(f"Error calling LLM API: {str(e)}")
         except (KeyError, IndexError) as e:
             raise Exception(f"Unexpected LLM response format: {str(e)}")
-

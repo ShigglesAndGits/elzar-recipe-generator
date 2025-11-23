@@ -289,11 +289,12 @@ async def consume_items(request: InventoryActionRequest):
                     continue
                 
                 # Consume the product
+                # Don't pass location_id - let Grocy use the product's default location
                 await grocy_client.consume_product(
                     product_id=item.product_id,
                     amount=item.amount,
                     spoiled=False,
-                    location_id=item.location_id
+                    location_id=None
                 )
                 
                 results["success"].append({

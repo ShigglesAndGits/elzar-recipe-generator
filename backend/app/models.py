@@ -90,3 +90,83 @@ class NotificationRequest(BaseModel):
     recipe_id: int
     title: Optional[str] = "Recipe from Elzar"
 
+
+# Inventory Management Models (v1.1)
+class ParsedItem(BaseModel):
+    """Parsed item from text input with Grocy product matching"""
+    original_text: str
+    item_name: str
+    quantity: float
+    unit: str
+    matched_product_id: Optional[int] = None
+    matched_product_name: Optional[str] = None
+    confidence: str  # "high", "medium", "low", "new"
+    suggested_location_id: Optional[int] = None
+    suggested_location_name: Optional[str] = None
+
+
+class InventoryParseRequest(BaseModel):
+    """Request to parse inventory text"""
+    text: str
+    action_type: str  # "purchase" or "consume"
+
+
+class InventoryItem(BaseModel):
+    """Item for inventory transaction"""
+    product_id: Optional[int] = None
+    product_name: str
+    quantity: float
+    unit: str
+    action: str  # "purchase", "consume", "skip"
+    create_if_missing: bool = False
+    location_id: Optional[int] = None
+    best_before_date: Optional[str] = None
+    price: Optional[float] = None
+
+
+class InventoryActionRequest(BaseModel):
+    """Request to perform inventory actions"""
+    items: List[InventoryItem]
+
+
+class ProductCreateRequest(BaseModel):
+    """Request to create new products"""
+    name: str
+    location_id: int
+    qu_id_stock: int
+    description: str = ""
+
+
+class RecipeIngredient(BaseModel):
+    """Ingredient extracted from recipe with Grocy matching"""
+    ingredient_text: str
+    product_id: Optional[int] = None
+    product_name: str
+    quantity: float
+    unit: str
+    confidence: str  # "high", "medium", "low", "new"
+    in_stock: bool
+    stock_amount: Optional[float] = None
+    qu_id: Optional[int] = None  # Quantity unit ID
+
+
+class RecipeConsumeRequest(BaseModel):
+    """Request to consume recipe ingredients"""
+    recipe_id: int  # Our internal recipe ID
+    ingredients: List[RecipeIngredient]
+
+
+class RecipeShoppingListRequest(BaseModel):
+    """Request to add missing ingredients to shopping list"""
+    recipe_id: int
+    ingredients: List[RecipeIngredient]
+
+
+class RecipeSaveRequest(BaseModel):
+    """Request to save recipe to Grocy"""
+    recipe_id: int  # Our internal recipe ID
+    recipe_name: str
+    servings: int
+    recipe_text: str
+    ingredients: List[RecipeIngredient]
+

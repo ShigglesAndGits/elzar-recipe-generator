@@ -120,47 +120,265 @@ class GrocyClient:
         except httpx.HTTPError as e:
             raise Exception(f"Error fetching Grocy inventory: {str(e)}")
     
-    async def add_recipe_to_grocy(
-        self, 
-        recipe_name: str, 
-        ingredients: List[Dict[str, Any]]
-    ) -> int:
-        """
-        Add a recipe to Grocy (future feature)
-        
-        Args:
-            recipe_name: Name of the recipe
-            ingredients: List of ingredients with product_id and amount
-        
-        Returns:
-            Recipe ID
-        """
-        # TODO: Implement recipe creation in Grocy
-        # This will be part of Phase 10 (Future Features)
-        raise NotImplementedError("Recipe creation in Grocy not yet implemented")
+    async def get_locations(self) -> List[Dict[str, Any]]:
+        """Get all storage locations from Grocy"""
+        async with httpx.AsyncClient() as client:
+            response = await client.get(
+                f"{self.base_url}/api/objects/locations",
+                headers=self.headers,
+                timeout=30.0
+            )
+            response.raise_for_status()
+            return response.json()
     
-    async def add_to_shopping_list(
-        self, 
-        product_id: int, 
-        amount: float
+    async def get_quantity_units(self) -> List[Dict[str, Any]]:
+        """Get all quantity units from Grocy"""
+        async with httpx.AsyncClient() as client:
+            response = await client.get(
+                f"{self.base_url}/api/objects/quantity_units",
+                headers=self.headers,
+                timeout=30.0
+            )
+            response.raise_for_status()
+            return response.json()
+    
+    async def purchase_product(
+        self,
+        product_id: int,
+        amount: float,
+        best_before_date: Optional[str] = None,
+        price: Optional[float] = None,
+        location_id: Optional[int] = None
     ) -> Dict[str, Any]:
         """
-        Add an item to Grocy shopping list (future feature)
+        Add stock to a product (purchase/add)
+        
+        Args:
+            product_id: Grocy product ID
+            amount: Quantity to add
+            best_before_date: Optional expiration date (YYYY-MM-DD)
+            price: Optional price paid
+            location_id: Optional storage location ID
+        
+        Returns:
+            Transaction details
         """
-        # TODO: Implement shopping list addition
-        # This will be part of Phase 10 (Future Features)
-        raise NotImplementedError("Shopping list addition not yet implemented")
+        body = {
+            "amount": amount,
+            "transaction_type": "purchase"
+        }
+        
+        if best_before_date:
+            body["best_before_date"] = best_before_date
+        if price is not None:
+            body["price"] = price
+        if location_id is not None:
+            body["location_id"] = location_id
+        
+        async with httpx.AsyncClient() as client:
+            response = await client.post(
+                f"{self.base_url}/api/stock/products/{product_id}/add",
+                headers=self.headers,
+                json=body,
+                timeout=30.0
+            )
+            response.raise_for_status()
+            return response.json()
     
     async def consume_product(
         self, 
         product_id: int, 
         amount: float, 
-        spoiled: bool = False
+        spoiled: bool = False,
+        location_id: Optional[int] = None
     ) -> Dict[str, Any]:
         """
-        Mark a product as consumed in Grocy (future feature)
+        Remove stock from a product (consume/use)
+        
+        Args:
+            product_id: Grocy product ID
+            amount: Quantity to consume
+            spoiled: Whether the product was spoiled
+            location_id: Optional location to consume from
+        
+        Returns:
+            Transaction details
         """
-        # TODO: Implement product consumption
-        # This will be part of Phase 10 (Future Features)
-        raise NotImplementedError("Product consumption not yet implemented")
+        body = {
+            "amount": amount,
+            "transaction_type": "consume",
+            "spoiled": spoiled
+        }
+        
+        if location_id is not None:
+            body["location_id"] = location_id
+        
+        async with httpx.AsyncClient() as client:
+            response = await client.post(
+                f"{self.base_url}/api/stock/products/{product_id}/consume",
+                headers=self.headers,
+                json=body,
+                timeout=30.0
+            )
+            response.raise_for_status()
+            return response.json()
+    
+    async def create_product(
+        self,
+        name: str,
+        location_id: int,
+        qu_id_stock: int,
+        qu_id_purchase: Optional[int] = None,
+        description: str = "",
+        min_stock_amount: int = 0
+    ) -> Dict[str, Any]:
+        """
+        Create a new product in Grocy
+        
+        Args:
+            name: Product name
+            location_id: Default storage location ID
+            qu_id_stock: Quantity unit ID for stock
+            qu_id_purchase: Quantity unit ID for purchase (defaults to stock unit)
+            description: Optional product description
+            min_stock_amount: Minimum stock amount for warnings
+        
+        Returns:
+            Created product details
+        """
+        body = {
+            "name": name,
+            "description": description,
+            "location_id": location_id,
+            "qu_id_stock": qu_id_stock,
+            "qu_id_purchase": qu_id_purchase or qu_id_stock,
+            "qu_factor_purchase_to_stock": 1,
+            "min_stock_amount": min_stock_amount
+        }
+        
+        async with httpx.AsyncClient() as client:
+            response = await client.post(
+                f"{self.base_url}/api/objects/products",
+                headers=self.headers,
+                json=body,
+                timeout=30.0
+            )
+            response.raise_for_status()
+            return response.json()
+    
+    async def add_to_shopping_list(
+        self, 
+        product_id: int, 
+        amount: float,
+        list_id: Optional[int] = None,
+        note: str = ""
+    ) -> Dict[str, Any]:
+        """
+        Add an item to Grocy shopping list
+        
+        Args:
+            product_id: Grocy product ID
+            amount: Quantity to add
+            list_id: Optional shopping list ID (default list if None)
+            note: Optional note
+        
+        Returns:
+            Shopping list item details
+        """
+        body = {
+            "product_id": product_id,
+            "product_amount": amount,
+            "note": note
+        }
+        
+        if list_id is not None:
+            body["list_id"] = list_id
+        
+        async with httpx.AsyncClient() as client:
+            response = await client.post(
+                f"{self.base_url}/api/stock/shoppinglist/add-product",
+                headers=self.headers,
+                json=body,
+                timeout=30.0
+            )
+            response.raise_for_status()
+            return response.json()
+    
+    async def create_recipe(
+        self,
+        name: str,
+        description: str,
+        base_servings: int = 1,
+        desired_servings: Optional[int] = None
+    ) -> Dict[str, Any]:
+        """
+        Create a recipe in Grocy
+        
+        Args:
+            name: Recipe name
+            description: Full recipe text/instructions
+            base_servings: Base number of servings
+            desired_servings: Desired servings (defaults to base_servings)
+        
+        Returns:
+            Created recipe details with recipe_id
+        """
+        body = {
+            "name": name,
+            "description": description,
+            "base_servings": base_servings,
+            "desired_servings": desired_servings or base_servings,
+            "type": "normal"
+        }
+        
+        async with httpx.AsyncClient() as client:
+            response = await client.post(
+                f"{self.base_url}/api/objects/recipes",
+                headers=self.headers,
+                json=body,
+                timeout=30.0
+            )
+            response.raise_for_status()
+            return response.json()
+    
+    async def add_recipe_ingredient(
+        self,
+        recipe_id: int,
+        product_id: int,
+        amount: float,
+        qu_id: int,
+        note: str = ""
+    ) -> Dict[str, Any]:
+        """
+        Add an ingredient to a recipe
+        
+        Args:
+            recipe_id: Grocy recipe ID
+            product_id: Grocy product ID
+            amount: Quantity needed
+            qu_id: Quantity unit ID
+            note: Optional note (e.g., "chopped", "diced")
+        
+        Returns:
+            Recipe ingredient details
+        """
+        body = {
+            "recipe_id": recipe_id,
+            "product_id": product_id,
+            "amount": amount,
+            "qu_id": qu_id,
+            "note": note,
+            "variable_amount": "",
+            "only_check_single_unit_in_stock": 0
+        }
+        
+        async with httpx.AsyncClient() as client:
+            response = await client.post(
+                f"{self.base_url}/api/objects/recipes_pos",
+                headers=self.headers,
+                json=body,
+                timeout=30.0
+            )
+            response.raise_for_status()
+            return response.json()
 

@@ -10,6 +10,7 @@ export default defineConfig({
     allowedHosts: [
       'localhost',
       '192.168.0.191',
+      '100.71.140.85',
       'gloves-of-thievery',
       '.local', // Allow all .local domains
     ],
@@ -17,6 +18,7 @@ export default defineConfig({
       '/api': {
         target: 'http://localhost:8001',
         changeOrigin: true,
+        secure: false,
       },
     },
   },

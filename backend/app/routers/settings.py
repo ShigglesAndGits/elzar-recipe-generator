@@ -338,7 +338,6 @@ async def setup_unit_conversions():
         
         return {
             "status": "success",
-            "system": system,
             "summary": {
                 "units_created": len(results["units_created"]),
                 "units_existing": len(results["units_existing"]),

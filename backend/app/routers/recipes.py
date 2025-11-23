@@ -11,7 +11,8 @@ from ..models import (
     RecipeIngredient,
     RecipeConsumeRequest,
     RecipeShoppingListRequest,
-    RecipeSaveRequest
+    RecipeSaveRequest,
+    InventoryActionRequest
 )
 from ..database import db
 from ..config import settings
@@ -791,6 +792,202 @@ async def save_recipe_to_grocy(recipe_id: int):
             except Exception as e:
                 results["ingredients_skipped"].append({
                     "ingredient": ingredient["ingredient_text"],
+                    "reason": str(e)
+                })
+        
+        return results
+        
+    except Exception as e:
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=f"Error saving recipe to Grocy: {str(e)}"
+        )
+
+
+@router.post("/{recipe_id}/save-to-grocy-reviewed")
+async def save_recipe_to_grocy_reviewed(recipe_id: int, request: InventoryActionRequest):
+    """
+    Save recipe to Grocy with reviewed ingredients
+    
+    This endpoint:
+    1. Gets the recipe from database
+    2. Uses LLM to format the recipe cleanly
+    3. Creates missing products if requested
+    4. Creates recipe in Grocy
+    5. Links reviewed ingredients to the recipe
+    6. Returns Grocy recipe ID and summary
+    """
+    config = await get_effective_config()
+    
+    # Get recipe
+    recipe = await db.get_recipe(recipe_id)
+    if not recipe:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Recipe not found"
+        )
+    
+    # Initialize clients
+    grocy_client = GrocyClient(config["grocy_url"], config["grocy_api_key"])
+    llm_client = LLMClient(
+        config["llm_api_url"],
+        config["llm_api_key"],
+        config["llm_model"]
+    )
+    
+    try:
+        # Format recipe for Grocy (strip Elzar's voice, clean formatting)
+        formatted_recipe = await llm_client.format_recipe_for_grocy(recipe["recipe_text"])
+        
+        # Get Grocy data for product creation
+        quantity_units = await grocy_client.get_quantity_units()
+        locations = await grocy_client.get_locations()
+        default_location_id = locations[0]["id"] if locations else 1
+        
+        # Create unit lookup
+        unit_lookup = {qu["name"].lower(): qu["id"] for qu in quantity_units}
+        unit_lookup.update({
+            "count": unit_lookup.get("piece", unit_lookup.get("pcs", 1)),
+            "g": unit_lookup.get("gram", unit_lookup.get("g", 1)),
+            "kg": unit_lookup.get("kilogram", unit_lookup.get("kg", 1)),
+            "ml": unit_lookup.get("milliliter", unit_lookup.get("ml", 1)),
+            "l": unit_lookup.get("liter", unit_lookup.get("l", 1)),
+            "oz": unit_lookup.get("ounce", unit_lookup.get("oz", 1)),
+            "lb": unit_lookup.get("pound", unit_lookup.get("lb", 1)),
+            "fl oz": unit_lookup.get("fluid ounce", unit_lookup.get("fl oz", 1)),
+        })
+        
+        # Extract recipe title from formatted text
+        recipe_lines = formatted_recipe.split("\n")
+        recipe_title = recipe_lines[0].replace("#", "").strip() if recipe_lines else "Elzar Recipe"
+        
+        # Infer servings from formatted recipe text
+        servings = 4  # Default
+        for line in recipe_lines[:10]:
+            if "serving" in line.lower():
+                import re
+                numbers = re.findall(r'\d+', line)
+                if numbers:
+                    servings = int(numbers[0])
+                    break
+        
+        # Process reviewed ingredients - create missing products
+        results = {
+            "grocy_recipe_id": None,
+            "recipe_name": recipe_title,
+            "servings": servings,
+            "ingredients_added": [],
+            "ingredients_skipped": [],
+            "created_products": []
+        }
+        
+        processed_ingredients = []
+        
+        for item in request.items:
+            product_id = item.product_id
+            
+            # Create product if needed
+            if item.create_if_missing and not product_id:
+                # Get or create unit
+                unit_lower = item.unit.lower() if item.unit else "unit"
+                qu_id = unit_lookup.get(unit_lower)
+                
+                if not qu_id:
+                    # Try to create common units
+                    common_units = {
+                        "g": ("Gram", "Grams"),
+                        "kg": ("Kilogram", "Kilograms"),
+                        "oz": ("Ounce", "Ounces"),
+                        "lb": ("Pound", "Pounds"),
+                        "ml": ("Milliliter", "Milliliters"),
+                        "l": ("Liter", "Liters"),
+                        "fl oz": ("Fluid Ounce", "Fluid Ounces"),
+                    }
+                    
+                    if unit_lower in common_units:
+                        name, plural = common_units[unit_lower]
+                        try:
+                            created_unit = await grocy_client.create_quantity_unit(name, plural, unit_lower)
+                            qu_id = created_unit["created_object_id"]
+                            unit_lookup[unit_lower] = qu_id
+                        except Exception as unit_error:
+                            if "constraint" in str(unit_error).lower() or "unique" in str(unit_error).lower():
+                                existing_units = await grocy_client.get_quantity_units()
+                                unit_lookup = {u["name"].lower(): u["id"] for u in existing_units}
+                                qu_id = unit_lookup.get(unit_lower) or unit_lookup.get(name.lower())
+                    
+                    if not qu_id:
+                        qu_id = unit_lookup.get("unit", 1)
+                
+                # Create product
+                try:
+                    created_product = await grocy_client.create_product(
+                        name=item.product_name,
+                        location_id=item.location_id or default_location_id,
+                        qu_id_stock=qu_id
+                    )
+                    product_id = created_product["created_object_id"]
+                    results["created_products"].append({
+                        "name": item.product_name,
+                        "id": product_id
+                    })
+                except Exception as product_error:
+                    if "constraint" in str(product_error).lower() or "unique" in str(product_error).lower():
+                        products = await grocy_client.get_products()
+                        matching_product = next(
+                            (p for p in products if p["name"].lower() == item.product_name.lower()),
+                            None
+                        )
+                        if matching_product:
+                            product_id = matching_product["id"]
+            
+            if product_id:
+                # Get quantity unit ID for this ingredient
+                unit_str = item.unit.lower() if item.unit else "unit"
+                qu_id = unit_lookup.get(unit_str, 1)
+                
+                processed_ingredients.append({
+                    "product_id": product_id,
+                    "product_name": item.product_name,
+                    "amount": item.amount,
+                    "unit": item.unit,
+                    "qu_id": qu_id
+                })
+            else:
+                results["ingredients_skipped"].append({
+                    "ingredient": item.product_name,
+                    "reason": "No product ID and creation not enabled"
+                })
+        
+        # Create recipe in Grocy
+        created_recipe = await grocy_client.create_recipe(
+            name=recipe_title,
+            description=formatted_recipe,
+            base_servings=servings
+        )
+        
+        grocy_recipe_id = created_recipe["created_object_id"]
+        results["grocy_recipe_id"] = grocy_recipe_id
+        
+        # Add ingredients to recipe
+        for ingredient in processed_ingredients:
+            try:
+                await grocy_client.add_recipe_ingredient(
+                    recipe_id=grocy_recipe_id,
+                    product_id=ingredient["product_id"],
+                    amount=ingredient["amount"],
+                    qu_id=ingredient["qu_id"],
+                    note=""
+                )
+                
+                results["ingredients_added"].append({
+                    "product_name": ingredient["product_name"],
+                    "quantity": ingredient["amount"],
+                    "unit": ingredient["unit"]
+                })
+            except Exception as e:
+                results["ingredients_skipped"].append({
+                    "ingredient": ingredient["product_name"],
                     "reason": str(e)
                 })
         

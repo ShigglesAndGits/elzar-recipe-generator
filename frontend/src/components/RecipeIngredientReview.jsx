@@ -2,7 +2,8 @@ import React, { useState, useEffect } from 'react';
 import { 
   purchaseItems, 
   consumeItems,
-  addItemsToShoppingList
+  addItemsToShoppingList,
+  saveRecipeToGrocyReviewed
 } from '../api';
 
 function RecipeIngredientReview({ 
@@ -88,14 +89,15 @@ function RecipeIngredientReview({
           created_products: rawResult.created_products || []
         };
       } else {
-        // save
-        const rawResult = await purchaseItems(transactionItems);
+        // save - call the proper save recipe endpoint
+        const rawResult = await saveRecipeToGrocyReviewed(recipeId, transactionItems);
         result = {
-          recipe_name: "Recipe",
-          servings: 4,
-          grocy_recipe_id: null,
-          ingredients_added: rawResult.success || [],
-          ingredients_skipped: rawResult.failed || []
+          recipe_name: rawResult.recipe_name || "Recipe",
+          servings: rawResult.servings || 4,
+          grocy_recipe_id: rawResult.grocy_recipe_id,
+          ingredients_added: rawResult.ingredients_added || [],
+          ingredients_skipped: rawResult.ingredients_skipped || [],
+          created_products: rawResult.created_products || []
         };
       }
 

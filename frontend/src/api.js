@@ -157,6 +157,11 @@ export const saveRecipeToGrocy = async (recipeId) => {
   return response.data;
 };
 
+export const saveRecipeToGrocyReviewed = async (recipeId, items) => {
+  const response = await api.post(`/api/recipes/${recipeId}/save-to-grocy-reviewed`, { items });
+  return response.data;
+};
+
 export const parseRecipeIngredients = async (recipeId, actionType = 'consume') => {
   const response = await api.post(`/api/recipes/${recipeId}/parse-ingredients?action_type=${actionType}`);
   return response.data;

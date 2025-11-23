@@ -255,31 +255,53 @@ async def consume_items(request: InventoryActionRequest):
         "failed": []
     }
     
+    # Get current stock to check availability
+    stock = await grocy_client.get_stock()
+    stock_by_product = {s["product_id"]: float(s.get("amount", 0)) for s in stock}
+    
     try:
         for item in request.items:
             if item.action != "consume":
                 continue
             
             try:
-                if item.product_id:
-                    await grocy_client.consume_product(
-                        product_id=item.product_id,
-                        amount=item.amount,
-                        spoiled=False,
-                        location_id=item.location_id
-                    )
-                    
-                    results["success"].append({
-                        "product_id": item.product_id,
-                        "product_name": item.product_name,
-                        "quantity": item.amount,
-                        "unit": item.unit
-                    })
-                else:
+                if not item.product_id:
                     results["failed"].append({
                         "product_name": item.product_name,
                         "reason": "No product ID - cannot consume"
                     })
+                    continue
+                
+                # Check if product has stock
+                current_stock = stock_by_product.get(item.product_id, 0)
+                if current_stock <= 0:
+                    results["failed"].append({
+                        "product_name": item.product_name,
+                        "reason": "No stock available"
+                    })
+                    continue
+                
+                if current_stock < item.amount:
+                    results["failed"].append({
+                        "product_name": item.product_name,
+                        "reason": f"Insufficient stock (have {current_stock} {item.unit}, need {item.amount} {item.unit})"
+                    })
+                    continue
+                
+                # Consume the product
+                await grocy_client.consume_product(
+                    product_id=item.product_id,
+                    amount=item.amount,
+                    spoiled=False,
+                    location_id=item.location_id
+                )
+                
+                results["success"].append({
+                    "product_id": item.product_id,
+                    "product_name": item.product_name,
+                    "quantity": item.amount,
+                    "unit": item.unit
+                })
                     
             except Exception as e:
                 results["failed"].append({

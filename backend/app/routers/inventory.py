@@ -401,8 +401,8 @@ async def add_to_shopping_list(request: InventoryActionRequest):
                 )
                 
                 results["success"].append({
-                    "item": item.product_name,
-                    "amount": item.amount,
+                    "product_name": item.product_name,
+                    "quantity": item.amount,
                     "unit": item.unit
                 })
                 

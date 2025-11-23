@@ -25,7 +25,7 @@ class Settings(BaseSettings):
     
     # Server
     backend_host: str = "0.0.0.0"
-    backend_port: int = 8000
+    backend_port: int = 8001
     
     class Config:
         env_file = ".env"

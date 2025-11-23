@@ -1,0 +1,18 @@
+[Unit]
+Description=Elzar Recipe Generator Frontend
+After=network.target
+
+[Service]
+Type=simple
+User=root
+WorkingDirectory=/root/elzar-recipe-generator/frontend
+Environment="PATH=/usr/local/bin:/usr/bin:/bin"
+ExecStart=/usr/bin/npm run dev -- --host
+Restart=always
+RestartSec=3
+StandardOutput=append:/root/elzar-recipe-generator/frontend.log
+StandardError=append:/root/elzar-recipe-generator/frontend.log
+
+[Install]
+WantedBy=multi-user.target
+

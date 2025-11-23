@@ -93,12 +93,29 @@ async def purchase_items(request: InventoryActionRequest):
         unit_lookup = {qu["name"].lower(): qu["id"] for qu in quantity_units}
         # Add common aliases
         unit_lookup.update({
-            "count": unit_lookup.get("piece", unit_lookup.get("pcs", 1)),
-            "g": unit_lookup.get("gram", unit_lookup.get("g", 1)),
-            "kg": unit_lookup.get("kilogram", unit_lookup.get("kg", 1)),
-            "ml": unit_lookup.get("milliliter", unit_lookup.get("ml", 1)),
-            "l": unit_lookup.get("liter", unit_lookup.get("l", 1)),
+            "count": unit_lookup.get("piece", unit_lookup.get("pcs", 2)),  # Default to Piece
+            "g": unit_lookup.get("gram", unit_lookup.get("g", 2)),
+            "kg": unit_lookup.get("kilogram", unit_lookup.get("kg", 2)),
+            "ml": unit_lookup.get("milliliter", unit_lookup.get("ml", 2)),
+            "l": unit_lookup.get("liter", unit_lookup.get("l", 2)),
+            "oz": unit_lookup.get("ounce", unit_lookup.get("oz", 2)),
+            "lb": unit_lookup.get("pound", unit_lookup.get("lb", 2)),
+            "gal": unit_lookup.get("gallon", unit_lookup.get("gal", 2)),
         })
+        
+        # Common units to auto-create if missing
+        common_units = {
+            "gram": "grams",
+            "kilogram": "kilograms",
+            "ounce": "ounces",
+            "pound": "pounds",
+            "liter": "liters",
+            "milliliter": "milliliters",
+            "gallon": "gallons",
+            "cup": "cups",
+            "tablespoon": "tablespoons",
+            "teaspoon": "teaspoons",
+        }
         
         for item in request.items:
             if item.action != "purchase":
@@ -107,8 +124,25 @@ async def purchase_items(request: InventoryActionRequest):
             try:
                 # Create product if needed
                 if item.create_if_missing and item.product_id is None:
-                    # Get unit ID
-                    qu_id = unit_lookup.get(item.unit.lower(), 1)  # Default to first unit
+                    # Get or create unit ID
+                    unit_name_lower = item.unit.lower()
+                    qu_id = unit_lookup.get(unit_name_lower)
+                    
+                    # If unit doesn't exist, try to create it
+                    if not qu_id and unit_name_lower in common_units:
+                        try:
+                            new_unit = await grocy_client.create_quantity_unit(
+                                name=unit_name_lower.capitalize(),
+                                name_plural=common_units[unit_name_lower]
+                            )
+                            qu_id = new_unit["created_object_id"]
+                            unit_lookup[unit_name_lower] = qu_id
+                            print(f"✅ Created quantity unit: {unit_name_lower} (ID: {qu_id})")
+                        except Exception as e:
+                            print(f"⚠️ Failed to create unit '{unit_name_lower}': {e}")
+                            qu_id = 2  # Fallback to Piece
+                    elif not qu_id:
+                        qu_id = 2  # Default to Piece if not a common unit
                     
                     # Create product
                     created = await grocy_client.create_product(

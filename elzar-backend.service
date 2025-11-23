@@ -1,0 +1,18 @@
+[Unit]
+Description=Elzar Recipe Generator Backend
+After=network.target
+
+[Service]
+Type=simple
+User=root
+WorkingDirectory=/root/elzar-recipe-generator/backend
+Environment="PATH=/root/elzar-recipe-generator/backend/venv/bin:/usr/local/bin:/usr/bin:/bin"
+ExecStart=/root/elzar-recipe-generator/backend/venv/bin/python -m app.main
+Restart=always
+RestartSec=3
+StandardOutput=append:/root/elzar-recipe-generator/backend.log
+StandardError=append:/root/elzar-recipe-generator/backend.log
+
+[Install]
+WantedBy=multi-user.target
+

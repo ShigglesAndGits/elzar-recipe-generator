@@ -281,6 +281,45 @@ class GrocyClient:
                 print(f"❌ Failed to create product '{name}': {error_detail}")
                 raise Exception(error_detail)
     
+    async def create_quantity_unit(
+        self,
+        name: str,
+        name_plural: Optional[str] = None,
+        description: str = ""
+    ) -> Dict[str, Any]:
+        """
+        Create a new quantity unit in Grocy
+        
+        Args:
+            name: Unit name (singular)
+            name_plural: Plural form (defaults to name + 's')
+            description: Optional description
+        
+        Returns:
+            Created quantity unit details
+        """
+        body = {
+            "name": name,
+            "name_plural": name_plural or (name + "s"),
+            "description": description,
+            "active": 1
+        }
+        
+        async with httpx.AsyncClient() as client:
+            try:
+                response = await client.post(
+                    f"{self.base_url}/api/objects/quantity_units",
+                    headers=self.headers,
+                    json=body,
+                    timeout=30.0
+                )
+                response.raise_for_status()
+                return response.json()
+            except httpx.HTTPStatusError as e:
+                error_detail = f"Grocy API error: {e.response.status_code} - {e.response.text}"
+                print(f"❌ Failed to create quantity unit '{name}': {error_detail}")
+                raise Exception(error_detail)
+    
     async def add_to_shopping_list(
         self, 
         product_id: int, 

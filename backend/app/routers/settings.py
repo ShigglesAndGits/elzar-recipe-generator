@@ -114,7 +114,8 @@ async def update_core_config(update: CoreConfigUpdate):
             config["unit_preference"] = update.unit_preference
         
         # Write to .env file
-        env_path = Path(__file__).parent.parent / ".env"
+        # Path: routers/settings.py -> routers/ -> app/ -> backend/ -> .env
+        env_path = Path(__file__).parent.parent.parent / ".env"
         
         env_content = f"""GROCY_URL={config['grocy_url']}
 GROCY_API_KEY={config['grocy_api_key']}

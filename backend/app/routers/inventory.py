@@ -139,8 +139,18 @@ async def purchase_items(request: InventoryActionRequest):
                             unit_lookup[unit_name_lower] = qu_id
                             print(f"✅ Created quantity unit: {unit_name_lower} (ID: {qu_id})")
                         except Exception as e:
-                            print(f"⚠️ Failed to create unit '{unit_name_lower}': {e}")
-                            qu_id = 2  # Fallback to Piece
+                            # Unit might already exist, try to fetch it again
+                            if "constraint" in str(e).lower() or "unique" in str(e).lower():
+                                print(f"ℹ️ Unit '{unit_name_lower}' already exists, fetching...")
+                                existing_units = await grocy_client.get_quantity_units()
+                                unit_lookup = {u["name"].lower(): u["id"] for u in existing_units}
+                                qu_id = unit_lookup.get(unit_name_lower)
+                                if not qu_id:
+                                    print(f"⚠️ Failed to find unit '{unit_name_lower}' after refresh: {e}")
+                                    qu_id = 2  # Fallback to Piece
+                            else:
+                                print(f"⚠️ Failed to create unit '{unit_name_lower}': {e}")
+                                qu_id = 2  # Fallback to Piece
                     elif not qu_id:
                         qu_id = 2  # Default to Piece if not a common unit
                     
@@ -313,9 +323,20 @@ async def add_to_shopping_list(request: InventoryActionRequest):
                         
                         if unit_lower in common_units:
                             name, plural = common_units[unit_lower]
-                            created_unit = await grocy_client.create_quantity_unit(name, plural, unit_lower)
-                            qu_id = created_unit["created_object_id"]
-                            unit_name_to_id[unit_lower] = qu_id
+                            try:
+                                created_unit = await grocy_client.create_quantity_unit(name, plural, unit_lower)
+                                qu_id = created_unit["created_object_id"]
+                                unit_name_to_id[unit_lower] = qu_id
+                            except Exception as unit_error:
+                                # Unit might already exist, try to fetch it again
+                                if "constraint" in str(unit_error).lower() or "unique" in str(unit_error).lower():
+                                    existing_units = await grocy_client.get_quantity_units()
+                                    unit_name_to_id = {u["name"].lower(): u["id"] for u in existing_units}
+                                    qu_id = unit_name_to_id.get(unit_lower) or unit_name_to_id.get(name.lower())
+                                    if not qu_id:
+                                        raise unit_error
+                                else:
+                                    raise unit_error
                         else:
                             qu_id = unit_name_to_id.get("unit", 1)
                     

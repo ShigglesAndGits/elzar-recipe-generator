@@ -188,7 +188,7 @@ Return ONLY a valid JSON array with NO additional text or explanation:
             else "Use imperial units (oz, lb, fl oz, gal) for quantities."
         )
         
-        prompt = f"""You are a recipe analysis assistant. Extract all ingredients from this recipe and match them to Grocy products.
+        prompt = f"""You are a recipe analysis assistant. Extract all ingredients from this recipe and match them to EXISTING Grocy products.
 
 RECIPE TEXT:
 {recipe_text}
@@ -201,12 +201,19 @@ CURRENT STOCK LEVELS:
 
 TASK:
 For each ingredient in the recipe:
-1. Extract ingredient name (normalized)
+1. Extract ingredient name (normalized to match Grocy products)
 2. Extract quantity as a number
 3. Extract unit. {unit_guidance}
-4. Match to Grocy product (use product ID)
+4. **IMPORTANT**: Match to an EXISTING Grocy product from the list above whenever possible
+   - Example: If recipe says "Parmesan Cheese" and Grocy has "Parmesan", use "Parmesan" (the existing product)
+   - Example: If recipe says "2% Milk" and Grocy has "Milk", use "Milk" (the existing product)
+   - Only mark as NEW if there's truly no reasonable match in the Grocy product list
 5. Check if in stock and if quantity is sufficient
-6. Assign confidence (high/medium/low/new)
+6. Assign confidence:
+   - high: Exact match to existing product
+   - medium: Close match to existing product
+   - low: Uncertain match
+   - new: No reasonable match found in Grocy products
 
 Return ONLY a valid JSON array with NO additional text:
 [

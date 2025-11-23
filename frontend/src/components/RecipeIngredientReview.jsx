@@ -16,6 +16,7 @@ function RecipeIngredientReview({
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState(null);
   const [results, setResults] = useState(null);
+
   useEffect(() => {
     if (parsedItems) {
       setItems(parsedItems.map(item => ({
@@ -25,6 +26,12 @@ function RecipeIngredientReview({
       })));
     }
   }, [parsedItems]);
+
+  const handleItemChange = (index, field, value) => {
+    setItems(prev => prev.map((item, i) =>
+      i === index ? { ...item, [field]: value } : item
+    ));
+  };
 
   const handleToggleCreateIfMissing = (index) => {
     setItems(prev => prev.map((item, i) =>
@@ -48,8 +55,8 @@ function RecipeIngredientReview({
       const transactionItems = selectedItems.map(item => ({
         product_id: item.grocy_product_id,
         product_name: item.item_name,
-        amount: item.quantity,
-        unit: item.unit,
+        amount: parseFloat(item.quantity) || 1.0,
+        unit: item.unit || 'unit',
         location_id: item.location_id,
         quantity_unit_id: item.quantity_unit_id,
         best_before_date: null,
@@ -104,14 +111,24 @@ function RecipeIngredientReview({
     }
   };
 
+  const getConfidenceBadge = (confidence) => {
+    const colors = {
+      high: 'bg-green-700 text-green-200',
+      medium: 'bg-yellow-700 text-yellow-200',
+      low: 'bg-orange-700 text-orange-200',
+      new: 'bg-red-700 text-red-200'
+    };
+    return colors[confidence] || colors.new;
+  };
+
   return (
     <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
-      <div className="bg-gray-800 rounded-lg max-w-6xl w-full max-h-[90vh] overflow-hidden flex flex-col">
+      <div className="bg-gray-800 rounded-lg max-w-7xl w-full max-h-[90vh] overflow-hidden flex flex-col">
         {/* Header */}
         <div className="bg-gray-700 px-6 py-4 border-b border-gray-600">
           <h3 className="text-xl font-bold text-white">{getActionTitle()}</h3>
           <p className="text-sm text-gray-300 mt-1">
-            Review and confirm ingredients before proceeding
+            Review and edit ingredients before proceeding
           </p>
         </div>
 
@@ -125,58 +142,79 @@ function RecipeIngredientReview({
 
           {!results ? (
             <div className="overflow-x-auto">
-              <table className="min-w-full bg-gray-700 rounded-lg">
+              <table className="w-full text-sm">
                 <thead>
-                  <tr className="bg-gray-600 text-left text-sm font-semibold text-gray-200">
-                    <th className="p-3 rounded-tl-lg">Select</th>
-                    <th className="p-3">Ingredient</th>
-                    <th className="p-3">Quantity</th>
-                    <th className="p-3">Unit</th>
-                    <th className="p-3">Grocy Match</th>
-                    <th className="p-3">Status</th>
-                    <th className="p-3 rounded-tr-lg">Actions</th>
+                  <tr className="border-b border-gray-700">
+                    <th className="text-left py-2 px-2">Select</th>
+                    <th className="text-left py-2 px-2">Ingredient</th>
+                    <th className="text-left py-2 px-2">Quantity</th>
+                    <th className="text-left py-2 px-2">Unit</th>
+                    <th className="text-left py-2 px-2">Grocy Match</th>
+                    <th className="text-left py-2 px-2">Status</th>
+                    <th className="text-left py-2 px-2">Actions</th>
                   </tr>
                 </thead>
                 <tbody>
                   {items.map((item, index) => (
-                    <tr key={index} className="border-t border-gray-600 hover:bg-gray-600">
-                      <td className="p-3">
+                    <tr key={index} className="border-b border-gray-700 hover:bg-gray-750">
+                      <td className="py-2 px-2">
                         <input
                           type="checkbox"
                           checked={item.selected}
                           onChange={() => toggleItemSelection(index)}
-                          disabled={!item.grocy_product_id}
-                          className="form-checkbox text-elzar-red"
+                          className="form-checkbox text-elzar-red w-4 h-4"
                         />
                       </td>
-                      <td className="p-3 text-sm">{item.item_name}</td>
-                      <td className="p-3 text-sm">{item.quantity}</td>
-                      <td className="p-3 text-sm">{item.unit}</td>
-                      <td className="p-3 text-sm">
-                        {item.grocy_product_name || (
+                      <td className="py-2 px-2">
+                        <input
+                          type="text"
+                          value={item.item_name}
+                          onChange={(e) => handleItemChange(index, 'item_name', e.target.value)}
+                          className="bg-gray-700 border border-gray-600 rounded px-2 py-1 w-full text-sm focus:ring-2 focus:ring-elzar-red"
+                          placeholder="Item name"
+                        />
+                      </td>
+                      <td className="py-2 px-2">
+                        <input
+                          type="number"
+                          value={item.quantity}
+                          onChange={(e) => handleItemChange(index, 'quantity', e.target.value)}
+                          className="bg-gray-700 border border-gray-600 rounded px-2 py-1 w-20 text-sm focus:ring-2 focus:ring-elzar-red"
+                          step="0.1"
+                          min="0"
+                        />
+                      </td>
+                      <td className="py-2 px-2">
+                        <input
+                          type="text"
+                          value={item.unit}
+                          onChange={(e) => handleItemChange(index, 'unit', e.target.value)}
+                          className="bg-gray-700 border border-gray-600 rounded px-2 py-1 w-24 text-sm focus:ring-2 focus:ring-elzar-red"
+                          placeholder="unit"
+                        />
+                      </td>
+                      <td className="py-2 px-2">
+                        {item.grocy_product_name ? (
+                          <span className="text-green-400">{item.grocy_product_name}</span>
+                        ) : (
                           <span className="text-yellow-400">No Match</span>
                         )}
                       </td>
-                      <td className="p-3 text-sm">
-                        <span className={`px-2 py-1 rounded text-xs ${
-                          item.confidence === 'high' ? 'bg-green-700 text-green-200' :
-                          item.confidence === 'medium' ? 'bg-yellow-700 text-yellow-200' :
-                          item.confidence === 'low' ? 'bg-orange-700 text-orange-200' :
-                          'bg-red-700 text-red-200'
-                        }`}>
+                      <td className="py-2 px-2">
+                        <span className={`px-2 py-1 rounded text-xs font-semibold ${getConfidenceBadge(item.confidence)}`}>
                           {item.confidence === 'new' ? 'NEW' : item.confidence.toUpperCase()}
                         </span>
                       </td>
-                      <td className="p-3 text-sm">
+                      <td className="py-2 px-2">
                         {item.confidence === 'new' && !item.grocy_product_id ? (
                           <label className="flex items-center space-x-2">
                             <input
                               type="checkbox"
                               checked={item.create_if_missing}
                               onChange={() => handleToggleCreateIfMissing(index)}
-                              className="form-checkbox text-blue-600"
+                              className="form-checkbox text-blue-600 w-4 h-4"
                             />
-                            <span className="text-xs">Auto-create</span>
+                            <span className="text-xs whitespace-nowrap">Auto-create</span>
                           </label>
                         ) : (
                           <span className="text-xs text-gray-500">-</span>
@@ -187,8 +225,13 @@ function RecipeIngredientReview({
                 </tbody>
               </table>
 
-              <div className="mt-4 text-sm text-gray-400">
-                <p>💡 <strong>Tip:</strong> Items marked "NEW" will be automatically created in Grocy if "Auto-create" is checked.</p>
+              <div className="mt-4 p-3 bg-gray-700 rounded-lg text-sm text-gray-300">
+                <p className="font-semibold mb-1">💡 Tips:</p>
+                <ul className="list-disc list-inside space-y-1 text-xs">
+                  <li>Edit quantities and units directly in the table</li>
+                  <li>Items marked <span className="text-red-400 font-semibold">NEW</span> will be automatically created in Grocy if "Auto-create" is checked</li>
+                  <li>Uncheck items you don't want to process</li>
+                </ul>
               </div>
             </div>
           ) : (
@@ -202,22 +245,27 @@ function RecipeIngredientReview({
         </div>
 
         {/* Footer */}
-        <div className="bg-gray-700 px-6 py-4 border-t border-gray-600 flex justify-between">
-          <button
-            onClick={onClose}
-            className="bg-gray-600 hover:bg-gray-500 text-white font-bold py-2 px-6 rounded-lg transition-colors"
-          >
-            {results ? 'Close' : 'Cancel'}
-          </button>
-          {!results && (
+        <div className="bg-gray-700 px-6 py-4 border-t border-gray-600 flex justify-between items-center">
+          <div className="text-sm text-gray-300">
+            {!results && `${items.filter(i => i.selected).length} of ${items.length} items selected`}
+          </div>
+          <div className="flex space-x-3">
             <button
-              onClick={handleExecuteAction}
-              disabled={loading || items.filter(i => i.selected).length === 0}
-              className="bg-elzar-red hover:bg-red-600 disabled:bg-gray-600 text-white font-bold py-2 px-6 rounded-lg transition-colors"
+              onClick={onClose}
+              className="bg-gray-600 hover:bg-gray-500 text-white font-bold py-2 px-6 rounded-lg transition-colors"
             >
-              {loading ? 'Processing...' : getActionButtonText()}
+              {results ? 'Close' : 'Cancel'}
             </button>
-          )}
+            {!results && (
+              <button
+                onClick={handleExecuteAction}
+                disabled={loading || items.filter(i => i.selected).length === 0}
+                className="bg-elzar-red hover:bg-red-600 disabled:bg-gray-600 text-white font-bold py-2 px-6 rounded-lg transition-colors"
+              >
+                {loading ? 'Processing...' : getActionButtonText()}
+              </button>
+            )}
+          </div>
         </div>
       </div>
     </div>
@@ -225,4 +273,3 @@ function RecipeIngredientReview({
 }
 
 export default RecipeIngredientReview;
-

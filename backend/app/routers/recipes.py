@@ -416,6 +416,16 @@ async def parse_recipe_ingredients(recipe_id: int, action_type: str = "consume")
             product_id = ing.get("product_id")
             product_name = ing.get("product_name", "")
             
+            # If LLM provided product_id but no name, look up the name
+            if product_id and not product_name:
+                matched_product = next(
+                    (p for p in products if p["id"] == product_id),
+                    None
+                )
+                if matched_product:
+                    product_name = matched_product["name"]
+                    print(f"✓ Looked up name for product ID {product_id}: {product_name}")
+            
             # If LLM didn't provide product_id, try to match by name
             if not product_id and product_name:
                 # Try exact match first

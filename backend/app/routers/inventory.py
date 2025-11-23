@@ -363,7 +363,7 @@ async def add_to_shopping_list(request: InventoryActionRequest):
                 await grocy_client.add_to_shopping_list(
                     product_id=product_id,
                     amount=item.amount,
-                    shopping_list_id=1  # Default shopping list
+                    list_id=1  # Default shopping list
                 )
                 
                 results["success"].append({

@@ -3,7 +3,7 @@ from fastapi.middleware.cors import CORSMiddleware
 from contextlib import asynccontextmanager
 
 from .database import db
-from .routers import recipes, history, profiles, settings
+from .routers import recipes, history, profiles, settings, inventory
 
 
 @asynccontextmanager
@@ -21,7 +21,7 @@ async def lifespan(app: FastAPI):
 app = FastAPI(
     title="Elzar - Grocy Recipe Generator",
     description="BAM! Generate amazing recipes from your Grocy inventory! 🌶️",
-    version="1.0.0",
+    version="1.1.0",
     lifespan=lifespan
 )
 
@@ -39,6 +39,7 @@ app.include_router(recipes.router)
 app.include_router(history.router)
 app.include_router(profiles.router)
 app.include_router(settings.router)
+app.include_router(inventory.router)
 
 
 @app.get("/")
@@ -46,7 +47,7 @@ async def root():
     """Root endpoint"""
     return {
         "name": "Elzar - Grocy Recipe Generator",
-        "version": "1.0.0",
+        "version": "1.1.0",
         "message": "BAM! Welcome to Elzar! 🌶️",
         "docs": "/docs"
     }

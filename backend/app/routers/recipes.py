@@ -7,13 +7,18 @@ from pathlib import Path
 from ..models import (
     RecipeGenerationRequest,
     RecipeResponse,
-    NotificationRequest
+    NotificationRequest,
+    RecipeIngredient,
+    RecipeConsumeRequest,
+    RecipeShoppingListRequest,
+    RecipeSaveRequest
 )
 from ..database import db
 from ..config import settings
 from ..services.grocy_client import GrocyClient
 from ..services.llm_client import LLMClient
 from ..services.notification import NotificationService
+from ..services.inventory_matcher import InventoryMatcher
 from ..utils.recipe_parser import (
     extract_metadata_from_recipe,
     format_recipe_for_download
@@ -339,4 +344,334 @@ async def send_recipe_notification(recipe_id: int, notification: NotificationReq
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
             detail=f"Error sending notification: {str(e)}"
+        )
+
+
+@router.post("/{recipe_id}/consume-ingredients")
+async def consume_recipe_ingredients(recipe_id: int):
+    """
+    Extract ingredients from recipe and consume them from Grocy stock
+    
+    This endpoint:
+    1. Gets the recipe from database
+    2. Uses LLM to extract and match ingredients
+    3. Consumes matched ingredients from stock
+    4. Returns summary of what was consumed
+    """
+    config = await get_effective_config()
+    
+    # Get recipe
+    recipe = await db.get_recipe(recipe_id)
+    if not recipe:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Recipe not found"
+        )
+    
+    # Initialize clients
+    grocy_client = GrocyClient(config["grocy_url"], config["grocy_api_key"])
+    matcher = InventoryMatcher(
+        config["llm_api_url"],
+        config["llm_api_key"],
+        config["llm_model"]
+    )
+    
+    try:
+        # Get Grocy data
+        products = await grocy_client.get_products()
+        stock_info = await grocy_client.format_inventory_for_llm()
+        unit_preference = config.get("unit_preference", "metric")
+        
+        # Extract and match ingredients
+        ingredients = await matcher.extract_recipe_ingredients(
+            recipe["recipe_text"],
+            products,
+            stock_info,
+            unit_preference
+        )
+        
+        # Consume ingredients that are in stock
+        results = {
+            "consumed": [],
+            "skipped": [],
+            "insufficient_stock": []
+        }
+        
+        for ingredient in ingredients:
+            if not ingredient.get("product_id"):
+                results["skipped"].append({
+                    "ingredient": ingredient["ingredient_text"],
+                    "reason": "No matching product found"
+                })
+                continue
+            
+            if not ingredient.get("in_stock"):
+                results["skipped"].append({
+                    "ingredient": ingredient["ingredient_text"],
+                    "reason": "Not in stock"
+                })
+                continue
+            
+            # Check if we have enough stock
+            stock_amount = ingredient.get("stock_amount", 0)
+            needed_amount = ingredient["quantity"]
+            
+            if stock_amount < needed_amount:
+                results["insufficient_stock"].append({
+                    "ingredient": ingredient["ingredient_text"],
+                    "needed": needed_amount,
+                    "available": stock_amount,
+                    "unit": ingredient["unit"]
+                })
+                # Still consume what we have
+                needed_amount = stock_amount
+            
+            try:
+                await grocy_client.consume_product(
+                    product_id=ingredient["product_id"],
+                    amount=needed_amount
+                )
+                
+                results["consumed"].append({
+                    "product_name": ingredient["product_name"],
+                    "quantity": needed_amount,
+                    "unit": ingredient["unit"]
+                })
+            except Exception as e:
+                results["skipped"].append({
+                    "ingredient": ingredient["ingredient_text"],
+                    "reason": str(e)
+                })
+        
+        return results
+        
+    except Exception as e:
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=f"Error consuming ingredients: {str(e)}"
+        )
+
+
+@router.post("/{recipe_id}/add-missing-to-shopping-list")
+async def add_missing_to_shopping_list(recipe_id: int):
+    """
+    Extract ingredients from recipe and add missing ones to Grocy shopping list
+    
+    This endpoint:
+    1. Gets the recipe from database
+    2. Uses LLM to extract and match ingredients
+    3. Adds missing/insufficient ingredients to shopping list
+    4. Returns summary of what was added
+    """
+    config = await get_effective_config()
+    
+    # Get recipe
+    recipe = await db.get_recipe(recipe_id)
+    if not recipe:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Recipe not found"
+        )
+    
+    # Initialize clients
+    grocy_client = GrocyClient(config["grocy_url"], config["grocy_api_key"])
+    matcher = InventoryMatcher(
+        config["llm_api_url"],
+        config["llm_api_key"],
+        config["llm_model"]
+    )
+    
+    try:
+        # Get Grocy data
+        products = await grocy_client.get_products()
+        stock_info = await grocy_client.format_inventory_for_llm()
+        unit_preference = config.get("unit_preference", "metric")
+        
+        # Extract and match ingredients
+        ingredients = await matcher.extract_recipe_ingredients(
+            recipe["recipe_text"],
+            products,
+            stock_info,
+            unit_preference
+        )
+        
+        # Add missing ingredients to shopping list
+        results = {
+            "added": [],
+            "skipped": []
+        }
+        
+        for ingredient in ingredients:
+            # Skip if no product match
+            if not ingredient.get("product_id"):
+                results["skipped"].append({
+                    "ingredient": ingredient["ingredient_text"],
+                    "reason": "No matching product found - cannot add to shopping list"
+                })
+                continue
+            
+            # Check if missing or insufficient
+            stock_amount = ingredient.get("stock_amount", 0)
+            needed_amount = ingredient["quantity"]
+            
+            if ingredient.get("in_stock") and stock_amount >= needed_amount:
+                # We have enough, skip
+                continue
+            
+            # Calculate how much we need to buy
+            amount_to_buy = needed_amount - stock_amount if stock_amount > 0 else needed_amount
+            
+            try:
+                await grocy_client.add_to_shopping_list(
+                    product_id=ingredient["product_id"],
+                    amount=amount_to_buy,
+                    note=f"For recipe: {recipe.get('cuisine', 'Recipe')}"
+                )
+                
+                results["added"].append({
+                    "product_name": ingredient["product_name"],
+                    "quantity": amount_to_buy,
+                    "unit": ingredient["unit"],
+                    "reason": "Not in stock" if stock_amount == 0 else f"Insufficient (have {stock_amount})"
+                })
+            except Exception as e:
+                results["skipped"].append({
+                    "ingredient": ingredient["ingredient_text"],
+                    "reason": str(e)
+                })
+        
+        return results
+        
+    except Exception as e:
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=f"Error adding to shopping list: {str(e)}"
+        )
+
+
+@router.post("/{recipe_id}/save-to-grocy")
+async def save_recipe_to_grocy(recipe_id: int):
+    """
+    Save recipe to Grocy as a recipe entity with linked ingredients
+    
+    This endpoint:
+    1. Gets the recipe from database
+    2. Uses LLM to extract and match ingredients
+    3. Creates recipe in Grocy
+    4. Links ingredients to the recipe
+    5. Returns Grocy recipe ID
+    """
+    config = await get_effective_config()
+    
+    # Get recipe
+    recipe = await db.get_recipe(recipe_id)
+    if not recipe:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Recipe not found"
+        )
+    
+    # Initialize clients
+    grocy_client = GrocyClient(config["grocy_url"], config["grocy_api_key"])
+    matcher = InventoryMatcher(
+        config["llm_api_url"],
+        config["llm_api_key"],
+        config["llm_model"]
+    )
+    
+    try:
+        # Get Grocy data
+        products = await grocy_client.get_products()
+        stock_info = await grocy_client.format_inventory_for_llm()
+        quantity_units = await grocy_client.get_quantity_units()
+        unit_preference = config.get("unit_preference", "metric")
+        
+        # Create unit lookup
+        unit_lookup = {qu["name"].lower(): qu["id"] for qu in quantity_units}
+        unit_lookup.update({
+            "count": unit_lookup.get("piece", unit_lookup.get("pcs", 1)),
+            "g": unit_lookup.get("gram", unit_lookup.get("g", 1)),
+            "kg": unit_lookup.get("kilogram", unit_lookup.get("kg", 1)),
+            "ml": unit_lookup.get("milliliter", unit_lookup.get("ml", 1)),
+            "l": unit_lookup.get("liter", unit_lookup.get("l", 1)),
+        })
+        
+        # Extract and match ingredients
+        ingredients = await matcher.extract_recipe_ingredients(
+            recipe["recipe_text"],
+            products,
+            stock_info,
+            unit_preference
+        )
+        
+        # Extract recipe title from text (first line, remove markdown #)
+        recipe_lines = recipe["recipe_text"].split("\n")
+        recipe_title = recipe_lines[0].replace("#", "").strip() if recipe_lines else "Elzar Recipe"
+        
+        # Infer servings from recipe text or use default
+        servings = 4  # Default
+        for line in recipe_lines[:10]:  # Check first 10 lines
+            if "serving" in line.lower():
+                # Try to extract number
+                import re
+                numbers = re.findall(r'\d+', line)
+                if numbers:
+                    servings = int(numbers[0])
+                    break
+        
+        # Create recipe in Grocy
+        created_recipe = await grocy_client.create_recipe(
+            name=recipe_title,
+            description=recipe["recipe_text"],
+            base_servings=servings
+        )
+        
+        grocy_recipe_id = created_recipe["created_object_id"]
+        
+        # Add ingredients to recipe
+        results = {
+            "grocy_recipe_id": grocy_recipe_id,
+            "recipe_name": recipe_title,
+            "servings": servings,
+            "ingredients_added": [],
+            "ingredients_skipped": []
+        }
+        
+        for ingredient in ingredients:
+            if not ingredient.get("product_id"):
+                results["ingredients_skipped"].append({
+                    "ingredient": ingredient["ingredient_text"],
+                    "reason": "No matching product found"
+                })
+                continue
+            
+            # Get quantity unit ID
+            qu_id = unit_lookup.get(ingredient["unit"].lower(), 1)
+            
+            try:
+                await grocy_client.add_recipe_ingredient(
+                    recipe_id=grocy_recipe_id,
+                    product_id=ingredient["product_id"],
+                    amount=ingredient["quantity"],
+                    qu_id=qu_id,
+                    note=""
+                )
+                
+                results["ingredients_added"].append({
+                    "product_name": ingredient["product_name"],
+                    "quantity": ingredient["quantity"],
+                    "unit": ingredient["unit"]
+                })
+            except Exception as e:
+                results["ingredients_skipped"].append({
+                    "ingredient": ingredient["ingredient_text"],
+                    "reason": str(e)
+                })
+        
+        return results
+        
+    except Exception as e:
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=f"Error saving recipe to Grocy: {str(e)}"
         )

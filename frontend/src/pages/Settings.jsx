@@ -92,6 +92,7 @@ function Settings() {
       llm_model: config.llm_model,
       max_recipe_history: config.max_recipe_history,
       apprise_url: config.apprise_url || '',
+      unit_preference: config.unit_preference || 'metric',
     });
     setEditMode(true);
   };
@@ -230,6 +231,13 @@ function Settings() {
                   )}
                 </p>
               </div>
+
+              <div className="bg-gray-700 rounded-lg p-4">
+                <h3 className="font-semibold mb-2">Unit Preference</h3>
+                <p className="text-sm text-gray-300">
+                  {config.unit_preference === 'metric' ? '📏 Metric (g, kg, ml, l)' : '📐 Imperial (oz, lb, fl oz, gal)'}
+                </p>
+              </div>
             </div>
           ) : (
             <div className="space-y-4">
@@ -310,6 +318,37 @@ function Settings() {
                 />
                 <p className="text-xs text-gray-400 mt-1">
                   See <a href="https://github.com/caronc/apprise" target="_blank" rel="noopener noreferrer" className="text-elzar-orange hover:underline">Apprise docs</a> for URL formats
+                </p>
+              </div>
+
+              <div>
+                <label className="block text-sm font-medium mb-2">Unit Preference</label>
+                <div className="grid grid-cols-2 gap-2">
+                  <button
+                    type="button"
+                    onClick={() => setEditForm({...editForm, unit_preference: 'metric'})}
+                    className={`px-4 py-2 rounded-lg transition-colors ${
+                      editForm.unit_preference === 'metric'
+                        ? 'bg-elzar-orange text-white'
+                        : 'bg-gray-700 text-gray-300 hover:bg-gray-600'
+                    }`}
+                  >
+                    Metric (g, kg, ml, l)
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setEditForm({...editForm, unit_preference: 'imperial'})}
+                    className={`px-4 py-2 rounded-lg transition-colors ${
+                      editForm.unit_preference === 'imperial'
+                        ? 'bg-elzar-orange text-white'
+                        : 'bg-gray-700 text-gray-300 hover:bg-gray-600'
+                    }`}
+                  >
+                    Imperial (oz, lb, fl oz, gal)
+                  </button>
+                </div>
+                <p className="text-xs text-gray-400 mt-1">
+                  Used for inventory parsing and recipe ingredient matching
                 </p>
               </div>
 

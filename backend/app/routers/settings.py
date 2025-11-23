@@ -24,6 +24,7 @@ class ConfigResponse(BaseModel):
     max_recipe_history: int
     apprise_url: Optional[str] = None
     notification_configured: bool
+    unit_preference: str = "metric"  # "metric" or "imperial"
 
 
 class CoreConfigUpdate(BaseModel):
@@ -35,6 +36,7 @@ class CoreConfigUpdate(BaseModel):
     llm_model: Optional[str] = None
     max_recipe_history: Optional[int] = None
     apprise_url: Optional[str] = None
+    unit_preference: Optional[str] = None  # "metric" or "imperial"
 
 
 @router.get("/config", response_model=ConfigResponse)
@@ -67,7 +69,8 @@ async def get_config():
         llm_model=config["llm_model"],
         max_recipe_history=config["max_recipe_history"],
         apprise_url=config["apprise_url"],
-        notification_configured=config["apprise_url"] is not None and config["apprise_url"] != ""
+        notification_configured=config["apprise_url"] is not None and config["apprise_url"] != "",
+        unit_preference=config.get("unit_preference", "metric")
     )
 
 
@@ -99,6 +102,14 @@ async def update_core_config(update: CoreConfigUpdate):
             
         if update.apprise_url is not None:
             await db.set_setting("APPRISE_URL", update.apprise_url)
+        
+        if update.unit_preference is not None:
+            if update.unit_preference not in ["metric", "imperial"]:
+                raise HTTPException(
+                    status_code=status.HTTP_400_BAD_REQUEST,
+                    detail="unit_preference must be 'metric' or 'imperial'"
+                )
+            await db.set_setting("unit_preference", update.unit_preference)
             
         return {"status": "success", "message": "Configuration updated successfully"}
         

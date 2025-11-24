@@ -149,6 +149,18 @@ elzar-recipe-generator/
 
 **The easiest way to run Elzar!**
 
+#### Option 1: Portainer (Easiest - Web UI)
+
+1. Open Portainer → **Stacks** → **+ Add stack**
+2. Name it **elzar**
+3. Paste the docker-compose from [PORTAINER.md](PORTAINER.md)
+4. Add environment variables in Portainer UI
+5. Click **Deploy**!
+
+📖 **See [PORTAINER.md](PORTAINER.md) for step-by-step guide.**
+
+#### Option 2: Docker Compose (Command Line)
+
 ```bash
 # 1. Clone the repository
 git clone https://github.com/ShigglesAndGits/elzar-recipe-generator.git
@@ -164,9 +176,7 @@ docker-compose up -d --build
 # 4. Open browser to http://localhost
 ```
 
-**That's it!** 🎉
-
-📖 **See [DOCKER.md](DOCKER.md) for detailed Docker documentation.**
+📖 **See [DOCKER.md](DOCKER.md) for detailed Docker CLI documentation.**
 
 ---
 

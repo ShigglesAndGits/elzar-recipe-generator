@@ -2,6 +2,8 @@
 
 Deploy Elzar with Docker in minutes! This guide covers everything from local testing to production deployment.
 
+> **💡 Using Portainer?** Check out [PORTAINER.md](PORTAINER.md) for a web UI deployment guide!
+
 ## 📋 Prerequisites
 
 - Docker Engine 20.10+ ([Install Docker](https://docs.docker.com/engine/install/))

@@ -3,15 +3,23 @@ import axios from 'axios';
 // Dynamically determine API URL based on how the frontend is accessed
 // This allows the frontend to work with any hostname/IP
 const getApiBaseUrl = () => {
-  // If VITE_API_URL is set, use it
+  // If VITE_API_URL is set, use it (for development)
   if (import.meta.env.VITE_API_URL) {
     return import.meta.env.VITE_API_URL;
   }
   
-  // Otherwise, use the same host as the frontend but on port 8001
-  const protocol = window.location.protocol;
-  const hostname = window.location.hostname;
-  return `${protocol}//${hostname}:8001`;
+  // In Docker, nginx proxies /api/ to backend, so use relative path
+  // In development, use the same host as the frontend but on port 8001
+  const isDevelopment = import.meta.env.DEV;
+  
+  if (isDevelopment) {
+    const protocol = window.location.protocol;
+    const hostname = window.location.hostname;
+    return `${protocol}//${hostname}:8001`;
+  }
+  
+  // In production (Docker), use relative path (nginx will proxy)
+  return '';
 };
 
 const API_BASE_URL = getApiBaseUrl();

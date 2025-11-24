@@ -1,0 +1,66 @@
+version: '3.8'
+
+services:
+  # Backend - FastAPI application
+  backend:
+    build:
+      context: ./backend
+      dockerfile: Dockerfile
+    container_name: elzar-backend
+    restart: unless-stopped
+    environment:
+      # Grocy Configuration
+      - GROCY_URL=${GROCY_URL}
+      - GROCY_API_KEY=${GROCY_API_KEY}
+      
+      # LLM Configuration
+      - LLM_API_URL=${LLM_API_URL}
+      - LLM_API_KEY=${LLM_API_KEY}
+      - LLM_MODEL=${LLM_MODEL}
+      
+      # Optional Settings
+      - MAX_RECIPE_HISTORY=${MAX_RECIPE_HISTORY:-50}
+      - APPRISE_URL=${APPRISE_URL:-}
+      - UNIT_PREFERENCE=${UNIT_PREFERENCE:-imperial}
+      - BACKEND_PORT=8001
+    volumes:
+      # Persist SQLite database
+      - ./data:/app/data
+    networks:
+      - elzar-network
+    healthcheck:
+      test: ["CMD", "python", "-c", "import requests; requests.get('http://localhost:8001/api/settings/config', timeout=5)"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 10s
+
+  # Frontend - React + Nginx
+  frontend:
+    build:
+      context: ./frontend
+      dockerfile: Dockerfile
+    container_name: elzar-frontend
+    restart: unless-stopped
+    ports:
+      - "${ELZAR_PORT:-80}:80"
+    depends_on:
+      backend:
+        condition: service_healthy
+    networks:
+      - elzar-network
+    healthcheck:
+      test: ["CMD", "wget", "--no-verbose", "--tries=1", "--spider", "http://localhost/"]
+      interval: 30s
+      timeout: 3s
+      retries: 3
+      start_period: 5s
+
+networks:
+  elzar-network:
+    driver: bridge
+
+volumes:
+  data:
+    driver: local
+

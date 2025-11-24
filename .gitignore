@@ -56,3 +56,13 @@ data/recipes/*.txt
 !data/.gitkeep
 !data/recipes/.gitkeep
 
+# Docker
+*.pid
+*.seed
+*.pid.lock
+
+# Logs
+logs/
+*.log
+backend.log
+frontend.log

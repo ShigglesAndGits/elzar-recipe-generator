@@ -145,12 +145,39 @@ elzar-recipe-generator/
 
 ## 🚀 Quick Start
 
-### Prerequisites
+### 🐳 Docker Deployment (Recommended)
+
+**The easiest way to run Elzar!**
+
+```bash
+# 1. Clone the repository
+git clone https://github.com/ShigglesAndGits/elzar-recipe-generator.git
+cd elzar-recipe-generator
+
+# 2. Configure environment
+cp .env.example .env
+nano .env  # Add your Grocy URL, API keys
+
+# 3. Start Elzar
+docker-compose up -d --build
+
+# 4. Open browser to http://localhost
+```
+
+**That's it!** 🎉
+
+📖 **See [DOCKER.md](DOCKER.md) for detailed Docker documentation.**
+
+---
+
+### 📦 Manual Installation (Alternative)
+
+#### Prerequisites
 - Debian/Ubuntu Linux (or similar)
 - [Grocy](https://grocy.info/) instance with API access
 - OpenAI-compatible LLM API (OpenRouter, Ollama, etc.)
 
-### One-Command Setup (Fresh Debian LXC)
+#### One-Command Setup (Fresh Debian LXC)
 
 1. **On your LXC console**, add your SSH public key:
 ```bash

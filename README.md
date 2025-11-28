@@ -1,4 +1,6 @@
-# Elzar - AI-Powered Recipe Generator 🌶️
+# Elzar - AI Slop App For AI Sloppy Joes
+
+## This was created for personal use on my secure network. It was made with no security in mind, with very little QA, by someone with no development experience and no knowledge, and no real resources beyond Claude Code and a weekend to kill. I am posting it publicly because it makes it easier to pull to my test containers, NOT because it is worth the time to download and configure.
 
 *"BAM! Let's kick it up a notch!"*
 

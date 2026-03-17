@@ -15,12 +15,14 @@ Elzar is a self-hosted web application that generates creative recipes based on 
 
 ### 💬 Chat Interface (v2.0) — Landing Page
 - **Conversational Meal Planning**: Chat with Elzar about recipes, meal plans, inventory, and ideas
-- **13 Tool Calls**: The AI can create recipes, search history, manage ideas, query inventory/freezer, create prep cook sessions, generate shopping lists, edit recipes, and manage preferences — all through natural conversation
+- **17 Tool Calls**: The AI can create/edit/fork recipes, search history, manage ideas, query inventory/freezer, create prep cook sessions, generate shopping lists, manage preferences, and log/review cooking debriefs — all through natural conversation
 - **Session Management**: Persistent chat sessions with browse, resume, rename, and delete
 - **Collapsible Parameter Controls**: Same options as Quick Recipe (cuisine, effort, servings, calories, budget, equipment, profiles) available as session defaults in a compact header
 - **Spice Weasel Toggle**: Elzar's personality carries through the entire conversation
 - **Context-Aware**: System prompt includes user preferences, dietary profiles, Grocy inventory status, and session parameters
 - **Grocy-Aware**: Tool calls for inventory and freezer queries are automatically hidden when Grocy isn't configured
+- **Iterative Recipe Editing**: Edit recipes through conversation — "make it spicier" or "swap chicken for tofu." Fork locked recipes as variants automatically
+- **Cooking Debrief Loop**: Tell Elzar what worked, what flopped, and what was wasted. Recent debriefs feed into future planning for continuously improving meal plans
 
 ### 🍳 Quick Recipe (Generator)
 - **Smart Inventory Integration**: Automatically pulls available ingredients from Grocy
@@ -446,11 +448,12 @@ tail -f /root/elzar-recipe-generator/frontend.log
 
 - [x] Chat interface with tool calls (v2.0)
 - [x] Prep cook session backend (v2.0)
+- [x] Iterative recipe editing with variant forking (v2.0)
+- [x] Grocy-free experience audit (v2.0)
+- [x] Post-session debrief & feedback loop (v2.0)
 
 ### Planned 🚧
 - [ ] SSE streaming for chat responses
-- [ ] Iterative recipe editing via chat
-- [ ] Post-session debrief & feedback loop
 - [ ] Mobile-optimized UI improvements
 - [ ] Recipe notifications via Apprise
 - [ ] Nutritional dashboard

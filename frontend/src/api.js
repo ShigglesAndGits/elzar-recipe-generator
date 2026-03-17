@@ -346,4 +346,27 @@ export const saveMealPlanRecipeToGrocy = async (mealPlanId, recipeId) => {
   return response.data;
 };
 
+// Prep Cook Session APIs (v2.0)
+export const generatePrepCookSession = async (params) => {
+  const response = await api.post('/api/prepcook/generate', params, {
+    timeout: 300000, // 5 minute timeout
+  });
+  return response.data;
+};
+
+export const getPrepCookSessions = async (limit = 20, offset = 0) => {
+  const response = await api.get('/api/prepcook/', { params: { limit, offset } });
+  return response.data;
+};
+
+export const getPrepCookSession = async (sessionId) => {
+  const response = await api.get(`/api/prepcook/${sessionId}`);
+  return response.data;
+};
+
+export const deletePrepCookSession = async (sessionId) => {
+  const response = await api.delete(`/api/prepcook/${sessionId}`);
+  return response.data;
+};
+
 export default api;

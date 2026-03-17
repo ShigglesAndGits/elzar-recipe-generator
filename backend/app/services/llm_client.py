@@ -748,6 +748,196 @@ Provide ONLY the reformatted recipe with NO additional text."""
         except (KeyError, IndexError) as e:
             raise Exception(f"Unexpected LLM response format: {str(e)}")
 
+    def build_prep_cook_prompt(
+        self,
+        inventory: Dict[str, Any],
+        request_params: Dict[str, Any],
+        dietary_profiles: List[Dict[str, str]],
+        user_preferences: str = ""
+    ) -> str:
+        """Build the prompt for prep cook session generation."""
+        num_meals = request_params.get("num_meals", 3)
+        portions_per_meal = request_params.get("portions_per_meal", 4)
+        protein_anchor = request_params.get("protein_anchor", "")
+        calorie_target = request_params.get("calorie_target")
+        unit_preference = request_params.get("unit_preference", "imperial")
+        custom_persona = request_params.get("custom_persona", "You are a professional chef and nutritionist.")
+        user_prompt = request_params.get("user_prompt", "")
+
+        total_portions = num_meals * portions_per_meal
+        unit_system = "imperial units (oz, lb, cups, tbsp, tsp)" if unit_preference == "imperial" else "metric units (g, kg, ml, l)"
+
+        prompt_parts = [
+            f"{custom_persona} You are planning a BATCH COOK SESSION — a single day of cooking that produces multiple freezer-ready meals.",
+        ]
+
+        if user_preferences:
+            prompt_parts.extend([
+                "",
+                "USER PREFERENCES (take these into account for all suggestions):",
+                user_preferences,
+            ])
+
+        prompt_parts.extend([
+            "",
+            "BATCH COOK PARAMETERS:",
+            f"- Number of different meals: {num_meals}",
+            f"- Portions per meal: {portions_per_meal}",
+            f"- Total portions to produce: {total_portions}",
+        ])
+
+        if protein_anchor:
+            prompt_parts.extend([
+                "",
+                f"SHARED PROTEIN ANCHOR: {protein_anchor}",
+                "Divide this protein across multiple recipes. Show how much goes to each recipe.",
+                "If there's not enough for all recipes, supplement with other proteins.",
+            ])
+
+        if calorie_target:
+            prompt_parts.append(f"- Target calories per portion: ~{calorie_target}")
+
+        # Equipment
+        available_equipment = request_params.get("available_equipment", [])
+        if available_equipment:
+            prompt_parts.append("")
+            prompt_parts.append("AVAILABLE KITCHEN EQUIPMENT:")
+            for eq in available_equipment:
+                prompt_parts.append(f"- {eq}")
+            prompt_parts.append("Only use cooking methods that work with this equipment.")
+
+        # Inventory
+        use_inventory = request_params.get("use_inventory", True)
+        if use_inventory and inventory.get("available_items"):
+            prompt_parts.append("")
+            prompt_parts.append("AVAILABLE INGREDIENTS (from pantry/fridge):")
+            for item in inventory["available_items"][:50]:
+                prompt_parts.append(f"- {item['name']}: {item['amount']} {item['unit']}")
+
+            if request_params.get("prioritize_expiring") and inventory.get("expiring_soon"):
+                prompt_parts.append("")
+                prompt_parts.append("INGREDIENTS EXPIRING SOON (prioritize these!):")
+                for item in inventory["expiring_soon"]:
+                    prompt_parts.append(f"- {item['name']}: {item['amount']} (expires {item['expiry_date']})")
+
+        # Dietary restrictions
+        if dietary_profiles:
+            prompt_parts.append("")
+            prompt_parts.append("DIETARY RESTRICTIONS:")
+            for profile in dietary_profiles:
+                prompt_parts.append(f"- {profile['name']}: {profile['dietary_restrictions']}")
+
+        if user_prompt:
+            prompt_parts.append("")
+            prompt_parts.append(f"ADDITIONAL NOTES: {user_prompt}")
+
+        # Output format
+        prompt_parts.extend([
+            "",
+            "IMPORTANT BATCH COOK REQUIREMENTS:",
+            "- Every recipe MUST freeze well in individual portions",
+            "- Include reheating instructions (microwave + oven, from frozen)",
+            "- Include storage/portioning instructions",
+            "- Think about efficiency: what can cook simultaneously?",
+            "- Variety: different flavors, cuisines, and textures across meals",
+            "",
+            "OUTPUT FORMAT:",
+            "Your response MUST have these sections in order:",
+            "",
+            "1. OVERVIEW — A brief paragraph summarizing the session: what you're making, total yield, estimated total cost.",
+            "",
+            "2. RECIPES — Each recipe uses this EXACT delimited format:",
+            "",
+            "===RECIPE===",
+            "TITLE: [Recipe Name]",
+            f"PORTIONS: {portions_per_meal}",
+            "CALORIES: [estimated calories per portion]",
+            "PREP_TIME: [active prep time in minutes for this recipe]",
+            "ESTIMATED_COST: [total ingredient cost in USD, e.g. 12.50]",
+            "",
+            "**Ingredients:**",
+            f"- [ingredient with quantity in {unit_system}]",
+            "...",
+            "",
+            "**Instructions:**",
+            "1. [step]",
+            "...",
+            "",
+            "**Storage:** [How to portion and store]",
+            "",
+            "**Reheating:** [Microwave and oven instructions from frozen]",
+            "===END_RECIPE===",
+            "",
+            "3. PREP DAY TIMELINE — A chronological schedule for cook day:",
+            "===TIMELINE===",
+            "[time] - [action] (for which recipe)",
+            "[time] - [action]",
+            "...",
+            "===END_TIMELINE===",
+            "",
+            "4. SHOPPING LIST — Aggregated across all recipes, deduped and summed:",
+            "===SHOPPING_LIST===",
+            "PRODUCE:",
+            "- [item]: [total quantity]",
+            "PROTEINS:",
+            "- [item]: [total quantity]",
+            "DAIRY & REFRIGERATED:",
+            "- [item]: [total quantity]",
+            "PANTRY:",
+            "- [item]: [total quantity]",
+            "FROZEN:",
+            "- [item]: [total quantity]",
+            "===END_SHOPPING_LIST===",
+            "",
+            "CRITICAL RULES:",
+            f"1. Generate exactly {num_meals} recipes",
+            f"2. Each recipe yields {portions_per_meal} portions",
+            "3. Every recipe MUST be between ===RECIPE=== and ===END_RECIPE===",
+            "4. Include the TIMELINE between ===TIMELINE=== and ===END_TIMELINE===",
+            "5. Include the SHOPPING LIST between ===SHOPPING_LIST=== and ===END_SHOPPING_LIST===",
+            "6. Shopping list must aggregate across ALL recipes (don't list onions 3 times — sum them)",
+        ])
+
+        return "\n".join(prompt_parts)
+
+    async def generate_prep_cook_session(
+        self,
+        inventory: Dict[str, Any],
+        request_params: Dict[str, Any],
+        dietary_profiles: List[Dict[str, str]],
+        user_preferences: str = ""
+    ) -> str:
+        """Generate a prep cook session using the LLM. Returns raw text."""
+        prompt = self.build_prep_cook_prompt(
+            inventory, request_params, dietary_profiles, user_preferences
+        )
+
+        num_meals = request_params.get("num_meals", 3)
+        estimated_tokens = (num_meals * 600) + 1500  # recipes + overview + timeline + shopping
+        max_tokens = min(estimated_tokens, self.max_tokens)
+
+        payload = {
+            "model": self.model,
+            "messages": [{"role": "user", "content": prompt}],
+            "temperature": 0.7,
+            "max_tokens": max_tokens
+        }
+
+        try:
+            async with httpx.AsyncClient(timeout=300.0) as client:
+                response = await client.post(
+                    f"{self.api_url}/chat/completions",
+                    headers=self.headers,
+                    json=payload
+                )
+                response.raise_for_status()
+                data = response.json()
+                return data["choices"][0]["message"]["content"]
+        except httpx.HTTPError as e:
+            raise Exception(f"Error calling LLM API: {str(e)}")
+        except (KeyError, IndexError) as e:
+            raise Exception(f"Unexpected LLM response format: {str(e)}")
+
     async def regenerate_meal_plan_recipe(
         self,
         day: int,

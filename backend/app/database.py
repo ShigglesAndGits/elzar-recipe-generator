@@ -180,6 +180,35 @@ class Database:
                 ON meal_plan_recipes(meal_plan_id)
             """)
 
+            # Prep cook sessions table
+            await db.execute("""
+                CREATE TABLE IF NOT EXISTS prep_cook_sessions (
+                    id INTEGER PRIMARY KEY AUTOINCREMENT,
+                    num_meals INTEGER NOT NULL DEFAULT 3,
+                    portions_per_meal INTEGER NOT NULL DEFAULT 4,
+                    protein_anchor TEXT,
+                    calorie_target INTEGER,
+                    equipment TEXT DEFAULT '[]',
+                    active_profiles TEXT DEFAULT '[]',
+                    user_prompt TEXT,
+                    overview TEXT,
+                    timeline TEXT,
+                    shopping_list TEXT,
+                    llm_model TEXT,
+                    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+                )
+            """)
+            await db.execute("""
+                CREATE INDEX IF NOT EXISTS idx_prep_cook_sessions_created_at
+                ON prep_cook_sessions(created_at DESC)
+            """)
+
+            # Add prep_session_id to recipes (migration)
+            try:
+                await db.execute("ALTER TABLE recipes ADD COLUMN prep_session_id INTEGER")
+            except Exception:
+                pass  # Column already exists
+
             await db.commit()
     
     # Recipe operations
@@ -537,6 +566,116 @@ class Database:
         async with aiosqlite.connect(self.db_path) as db:
             cursor = await db.execute(
                 "DELETE FROM ideas WHERE id = ?", (idea_id,)
+            )
+            await db.commit()
+            return cursor.rowcount > 0
+
+    # Prep cook session operations
+    async def create_prep_cook_session(
+        self,
+        session_data: Dict[str, Any],
+        recipes: List[Dict[str, Any]]
+    ) -> int:
+        """Create a prep cook session and its recipes. Returns session ID."""
+        async with aiosqlite.connect(self.db_path) as db:
+            cursor = await db.execute("""
+                INSERT INTO prep_cook_sessions (
+                    num_meals, portions_per_meal, protein_anchor,
+                    calorie_target, equipment, active_profiles,
+                    user_prompt, overview, timeline, shopping_list, llm_model
+                ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+            """, (
+                session_data.get("num_meals", 3),
+                session_data.get("portions_per_meal", 4),
+                session_data.get("protein_anchor"),
+                session_data.get("calorie_target"),
+                json.dumps(session_data.get("equipment", [])),
+                json.dumps(session_data.get("active_profiles", [])),
+                session_data.get("user_prompt"),
+                session_data.get("overview"),
+                session_data.get("timeline"),
+                session_data.get("shopping_list"),
+                session_data.get("llm_model"),
+            ))
+            session_id = cursor.lastrowid
+
+            # Insert each recipe linked to this session
+            for recipe in recipes:
+                await db.execute("""
+                    INSERT INTO recipes (
+                        recipe_text, cuisine, time_minutes, effort_level,
+                        calories_per_serving, estimated_cost,
+                        used_external_ingredients, prioritize_expiring,
+                        active_profiles, llm_model, prep_session_id
+                    ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                """, (
+                    recipe.get("recipe_text"),
+                    recipe.get("cuisine"),
+                    recipe.get("time_minutes"),
+                    recipe.get("effort_level"),
+                    recipe.get("calories_per_serving"),
+                    recipe.get("estimated_cost"),
+                    0,
+                    0,
+                    json.dumps(session_data.get("active_profiles", [])),
+                    session_data.get("llm_model"),
+                    session_id,
+                ))
+
+            await db.commit()
+            return session_id
+
+    async def get_prep_cook_session(self, session_id: int) -> Optional[Dict[str, Any]]:
+        """Get a prep cook session with its recipes"""
+        async with aiosqlite.connect(self.db_path) as db:
+            db.row_factory = aiosqlite.Row
+            cursor = await db.execute(
+                "SELECT * FROM prep_cook_sessions WHERE id = ?", (session_id,)
+            )
+            row = await cursor.fetchone()
+            if not row:
+                return None
+            session = dict(row)
+
+            # Get linked recipes
+            cursor = await db.execute(
+                "SELECT * FROM recipes WHERE prep_session_id = ? ORDER BY id",
+                (session_id,)
+            )
+            recipe_rows = await cursor.fetchall()
+            session["recipes"] = [dict(r) for r in recipe_rows]
+            return session
+
+    async def get_prep_cook_sessions(
+        self, limit: int = 20, offset: int = 0
+    ) -> List[Dict[str, Any]]:
+        """Get prep cook session summaries"""
+        async with aiosqlite.connect(self.db_path) as db:
+            db.row_factory = aiosqlite.Row
+            cursor = await db.execute("""
+                SELECT pcs.*,
+                       COUNT(r.id) as recipe_count,
+                       SUM(r.estimated_cost) as estimated_total_cost
+                FROM prep_cook_sessions pcs
+                LEFT JOIN recipes r ON r.prep_session_id = pcs.id
+                GROUP BY pcs.id
+                ORDER BY pcs.created_at DESC
+                LIMIT ? OFFSET ?
+            """, (limit, offset))
+            rows = await cursor.fetchall()
+            return [dict(row) for row in rows]
+
+    async def delete_prep_cook_session(self, session_id: int) -> bool:
+        """Delete a prep cook session and unlink its recipes"""
+        async with aiosqlite.connect(self.db_path) as db:
+            # Unlink recipes (don't delete — they stay in history)
+            await db.execute(
+                "UPDATE recipes SET prep_session_id = NULL WHERE prep_session_id = ?",
+                (session_id,)
+            )
+            cursor = await db.execute(
+                "DELETE FROM prep_cook_sessions WHERE id = ?",
+                (session_id,)
             )
             await db.commit()
             return cursor.rowcount > 0

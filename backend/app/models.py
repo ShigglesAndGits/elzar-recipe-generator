@@ -319,6 +319,60 @@ class MealPlanSummary(BaseModel):
     total_people: int
     budget_level: str
     meal_count: int
-    estimated_total_cost: Optional[float] = None  # Sum of all recipe costs
+    estimated_total_cost: Optional[float] = None
+    created_at: datetime
+
+
+# Prep Cook Session Models (v2.0)
+class PrepCookRequest(BaseModel):
+    """Request model for prep cook session generation"""
+    num_meals: int = Field(default=3, ge=1, le=8)
+    portions_per_meal: int = Field(default=4, ge=1, le=20)
+    protein_anchor: Optional[str] = None  # e.g., "5 lb chuck roast"
+    calorie_target: Optional[int] = None  # Per portion
+    available_equipment: List[str] = Field(default_factory=list)
+    active_profiles: List[str] = Field(default_factory=list)
+    use_inventory: bool = True
+    prioritize_expiring: bool = False
+    user_prompt: Optional[str] = None
+
+
+class PrepCookRecipeResponse(BaseModel):
+    """A recipe within a prep cook session"""
+    id: int
+    title: str
+    recipe_text: str
+    portions: int
+    calories_per_serving: Optional[int] = None
+    time_minutes: Optional[int] = None
+    estimated_cost: Optional[float] = None
+    is_locked: bool = False
+    is_saved: bool = False
+
+
+class PrepCookSessionResponse(BaseModel):
+    """Response model for a prep cook session"""
+    id: int
+    num_meals: int
+    portions_per_meal: int
+    protein_anchor: Optional[str] = None
+    calorie_target: Optional[int] = None
+    overview: Optional[str] = None
+    timeline: Optional[str] = None
+    shopping_list: Optional[str] = None
+    recipes: List[PrepCookRecipeResponse]
+    estimated_total_cost: Optional[float] = None
+    created_at: datetime
+    llm_model: Optional[str] = None
+
+
+class PrepCookSessionSummary(BaseModel):
+    """Summary for prep cook session history"""
+    id: int
+    num_meals: int
+    portions_per_meal: int
+    protein_anchor: Optional[str] = None
+    recipe_count: int
+    estimated_total_cost: Optional[float] = None
     created_at: datetime
 

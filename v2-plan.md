@@ -109,24 +109,25 @@ services behind them.
   `GET /api/inventory/freezer` and `POST /api/inventory/freezer/consume` endpoints
 - Hidden when Grocy is not configured (section loads silently)
 
-**5. Prep Cook Sessions** (enhancement #2)
-- New DB tables: `prep_cook_sessions`, `prep_cook_recipes`
-- Session definition: date, target meals, portions per meal, shared protein anchor
-- LLM generates: recipes with portion counts, unified prep day timeline, reheating
-  instructions, total yield summary
-- Controls: number of meals, portions/meal, portion size, protein anchor, calorie
-  target, equipment checklist
-- Session history browsable from History page (or dedicated sub-view)
-- Aggregated shopping list generation (feeds into #6)
+**5. Prep Cook Sessions** (enhancement #2) — BACKEND ONLY, UI DEFERRED TO CHAT
+- Decision: No standalone Prep Cook page. Batch cook planning is inherently
+  conversational — you always want to discuss and iterate before committing.
+  The standalone form-driven UI has the same problem as the Meal Planner.
+- Backend infrastructure built and ready for Chat tool calls:
+  - DB table: `prep_cook_sessions` + `prep_session_id` FK on `recipes`
+  - LLM prompt: generates recipes with portions, reheating/storage instructions,
+    unified prep day timeline, and aggregated shopping list
+  - API: `POST /api/prepcook/generate`, `GET /api/prepcook/`, `GET /api/prepcook/{id}`,
+    `DELETE /api/prepcook/{id}`
+  - Pydantic models: `PrepCookRequest`, `PrepCookSessionResponse`, etc.
+- Frontend API functions wired up, ready for Chat to call
+- Chat will expose this via `create_prep_cook_session` tool call
 
-**6. Shopping List Enhancements** (enhancement #8)
-- Aggregate ingredients across all recipes in a prep cook session
-- Deduplicate and sum quantities
-- Subtract on-hand inventory (Grocy) + bulk prep inventory
-- Group by store section: PRODUCE & REFRIGERATED, PROTEINS, PANTRY, FROZEN, ALREADY HAVE
-- Plain text output optimized for text message copy/paste
-- 📋 Copy to Clipboard button — prominent, one-click
-- Works without Grocy (skips "subtract on hand" step, no "ALREADY HAVE" section)
+**6. Shopping List Enhancements** (enhancement #8) — DEFERRED TO CHAT
+- Shopping list aggregation is built into the prep cook LLM prompt (grouped by
+  store section, deduped/summed across recipes)
+- Full enhancements (Grocy inventory subtraction, copy-to-clipboard, standalone
+  generation from arbitrary recipe sets) will be added as Chat tool calls
 - Chat tool call: `generate_shopping_list(recipe_ids[])`
 
 ### Phase 3: Conversational Interface

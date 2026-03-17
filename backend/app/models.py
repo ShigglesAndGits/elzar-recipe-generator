@@ -15,10 +15,26 @@ class RecipeGenerationRequest(BaseModel):
     calories_per_serving: Optional[int] = None
     use_external_ingredients: bool = False
     elzar_voice: bool = True
-    servings: str = "3-4"  # 1-2, 3-4, 5-6, 7+
+    servings: str = "3-4"  # 1-2, 3-4, 5-6, 7+, 8+ (bulk)
+    bulk_prep: bool = False  # Bulk prep mode for freezer-friendly meals
     high_leftover_potential: bool = False
     available_equipment: List[str] = Field(default_factory=list)  # Kitchen equipment available
     user_prompt: Optional[str] = None  # Additional user notes
+
+
+class AdviceRequest(BaseModel):
+    """Request model for cooking advice"""
+    question: str = Field(..., min_length=1, max_length=1000)
+    active_profiles: List[str] = Field(default_factory=list)
+    elzar_voice: bool = False
+    include_inventory: bool = True  # Whether to include inventory context
+
+
+class AdviceResponse(BaseModel):
+    """Response model for cooking advice"""
+    question: str
+    advice: str
+    llm_model: str
 
 
 class RecipeResponse(BaseModel):
@@ -30,11 +46,27 @@ class RecipeResponse(BaseModel):
     effort_level: Optional[str] = None
     dish_preference: Optional[str] = None
     calories_per_serving: Optional[int] = None
+    estimated_cost: Optional[float] = None  # Estimated total cost in USD
     used_external_ingredients: bool
     prioritize_expiring: bool
     active_profiles: Optional[str] = None  # JSON string
     created_at: datetime
     llm_model: Optional[str] = None
+    is_locked: bool = False
+    is_saved: bool = False
+    tags: Optional[str] = "[]"  # JSON string
+    parent_recipe_id: Optional[int] = None
+
+
+class ManualRecipeCreate(BaseModel):
+    """Request model for manually creating a recipe"""
+    recipe_text: str = Field(..., min_length=1)
+    cuisine: Optional[str] = None
+    time_minutes: Optional[int] = Field(None, ge=1, le=1440)
+    effort_level: Optional[str] = None
+    calories_per_serving: Optional[int] = Field(None, ge=1)
+    is_locked: bool = False
+    is_saved: bool = False
 
 
 class RecipeFilter(BaseModel):
@@ -69,6 +101,18 @@ class DietaryProfileResponse(BaseModel):
     dietary_restrictions: str
     created_at: datetime
     updated_at: datetime
+
+
+# User Preferences Models
+class UserPreferencesUpdate(BaseModel):
+    """Model for updating user preferences"""
+    content: str = Field(..., max_length=8000)
+
+
+class UserPreferencesResponse(BaseModel):
+    """Response model for user preferences"""
+    content: str
+    updated_at: Optional[datetime] = None
 
 
 # Settings Models
@@ -171,4 +215,79 @@ class RecipeSaveRequest(BaseModel):
     servings: int
     recipe_text: str
     ingredients: List[RecipeIngredient]
+
+
+# Meal Planning Models (v1.2)
+class MealPlanRequest(BaseModel):
+    """Request model for meal plan generation"""
+    days: int = Field(default=7, ge=1, le=14)
+    people: int = Field(default=2, ge=1, le=12)
+
+    # Meal toggles
+    generate_breakfast: bool = True
+    generate_lunch: bool = True
+    generate_dinner: bool = True
+    generate_snacks: bool = False
+
+    # Budget level
+    budget_level: str = "moderate"  # "broke", "dirt_cheap", "cheap", "moderate", "high", "luxury"
+
+    # Daily calorie target (meals should help achieve this, not necessarily add up to it)
+    daily_calorie_target: Optional[int] = None
+
+    # Effort levels for each meal type (1-5: 1=pre-packaged, 5=high effort)
+    breakfast_effort: int = Field(default=2, ge=1, le=5)
+    lunch_effort: int = Field(default=2, ge=1, le=5)
+    dinner_effort: int = Field(default=3, ge=1, le=5)
+    snack_effort: int = Field(default=1, ge=1, le=5)
+
+    # Variety level (1=minimal variety/reuse ingredients, 5=maximum variety)
+    variety_level: int = Field(default=3, ge=1, le=5)
+
+    # Profile/dietary restrictions
+    active_profiles: List[str] = Field(default_factory=list)
+
+    # Use ingredients from Grocy inventory
+    use_inventory: bool = True
+    prioritize_expiring: bool = False
+
+    # Additional notes
+    user_prompt: Optional[str] = None
+
+
+class MealPlanRecipe(BaseModel):
+    """A single recipe within a meal plan"""
+    id: str  # Unique ID within the meal plan (e.g., "day1_dinner")
+    day: int  # Day number (1-14)
+    meal_type: str  # "breakfast", "lunch", "dinner", "snack"
+    title: str
+    recipe_text: str
+    calories_estimate: Optional[int] = None
+    prep_time_minutes: Optional[int] = None
+    servings: int = 2
+    estimated_cost: Optional[float] = None  # Estimated cost in USD
+
+
+class MealPlanResponse(BaseModel):
+    """Response model for generated meal plan"""
+    id: int
+    overview: str  # Summary/intro text
+    recipes: List[MealPlanRecipe]
+    total_days: int
+    total_people: int
+    budget_level: str
+    estimated_total_cost: Optional[float] = None  # Sum of all recipe costs
+    created_at: datetime
+    llm_model: Optional[str] = None
+
+
+class MealPlanSummary(BaseModel):
+    """Summary for meal plan history"""
+    id: int
+    total_days: int
+    total_people: int
+    budget_level: str
+    meal_count: int
+    estimated_total_cost: Optional[float] = None  # Sum of all recipe costs
+    created_at: datetime
 

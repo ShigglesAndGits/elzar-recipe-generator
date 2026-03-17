@@ -12,7 +12,9 @@ from ..models import (
     RecipeConsumeRequest,
     RecipeShoppingListRequest,
     RecipeSaveRequest,
-    InventoryActionRequest
+    InventoryActionRequest,
+    AdviceRequest,
+    AdviceResponse
 )
 from ..database import db
 from ..config import settings
@@ -29,24 +31,55 @@ from ..utils.config_manager import get_effective_config
 router = APIRouter(prefix="/api/recipes", tags=["recipes"])
 
 
+async def require_grocy_configured():
+    """
+    Check if Grocy is configured and raise an error if not.
+    Call this at the start of any endpoint that requires Grocy.
+    """
+    config = await get_effective_config()
+    if not config.get("grocy_url") or not config.get("grocy_api_key"):
+        raise HTTPException(
+            status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
+            detail="Grocy is not configured. Please set up Grocy URL and API key in Settings."
+        )
+
+
+async def get_user_preferences_text() -> str:
+    """Fetch user preferences content for LLM prompt injection"""
+    prefs = await db.get_user_preferences()
+    return prefs.get("content", "") or ""
+
+
 @router.post("/generate", response_model=RecipeResponse)
 async def generate_recipe(request: RecipeGenerationRequest):
     """
     Generate a new recipe based on Grocy inventory and user preferences
-    
+
     BAM! Let's make something delicious! 🌶️
     """
     config = await get_effective_config()
-    
-    # Initialize clients with effective config
-    grocy_client = GrocyClient(config["grocy_url"], config["grocy_api_key"])
+
+    # Check if Grocy is configured
+    grocy_configured = bool(config.get("grocy_url") and config.get("grocy_api_key"))
+
+    # Initialize LLM client
     llm_client = LLMClient(config["llm_api_url"], config["llm_api_key"], config["llm_model"])
-    
+
     try:
-        # Fetch Grocy inventory
-        inventory = await grocy_client.format_inventory_for_llm(
-            prioritize_expiring=request.prioritize_expiring
-        )
+        # Fetch Grocy inventory only if configured
+        inventory = {"available_items": [], "expiring_soon": []}
+        if grocy_configured:
+            grocy_client = GrocyClient(config["grocy_url"], config["grocy_api_key"])
+            try:
+                inventory = await grocy_client.format_inventory_for_llm(
+                    prioritize_expiring=request.prioritize_expiring
+                )
+            except Exception as e:
+                # Log error but continue without inventory
+                print(f"Warning: Could not fetch Grocy inventory: {e}")
+        else:
+            # Force use_external_ingredients when Grocy isn't configured
+            request.use_external_ingredients = True
         
         # Get active dietary profiles
         dietary_profiles = []
@@ -73,14 +106,19 @@ async def generate_recipe(request: RecipeGenerationRequest):
             "elzar_voice": request.elzar_voice,
             "servings": request.servings,
             "high_leftover_potential": request.high_leftover_potential,
-            "user_prompt": request.user_prompt
+            "user_prompt": request.user_prompt,
+            "custom_persona": config.get("custom_persona", "You are a professional chef and nutritionist.")
         }
         
+        # Fetch user preferences
+        user_preferences = await get_user_preferences_text()
+
         # Generate recipe with LLM
         recipe_text = await llm_client.generate_recipe(
             inventory=inventory,
             request_params=request_params,
-            dietary_profiles=dietary_profiles
+            dietary_profiles=dietary_profiles,
+            user_preferences=user_preferences
         )
         
         # Extract metadata from generated recipe
@@ -94,6 +132,7 @@ async def generate_recipe(request: RecipeGenerationRequest):
             "effort_level": extracted_metadata.get("effort_level") or request.effort_level,
             "dish_preference": request.dish_preference,
             "calories_per_serving": extracted_metadata.get("calories_per_serving") or request.calories_per_serving,
+            "estimated_cost": extracted_metadata.get("estimated_cost"),
             "used_external_ingredients": request.use_external_ingredients,
             "prioritize_expiring": request.prioritize_expiring,
             "active_profiles": request.active_profiles,
@@ -119,6 +158,7 @@ async def generate_recipe(request: RecipeGenerationRequest):
             effort_level=saved_recipe["effort_level"],
             dish_preference=saved_recipe["dish_preference"],
             calories_per_serving=saved_recipe["calories_per_serving"],
+            estimated_cost=saved_recipe.get("estimated_cost"),
             used_external_ingredients=saved_recipe["used_external_ingredients"],
             prioritize_expiring=saved_recipe["prioritize_expiring"],
             active_profiles=saved_recipe["active_profiles"],
@@ -130,6 +170,76 @@ async def generate_recipe(request: RecipeGenerationRequest):
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
             detail=f"Error generating recipe: {str(e)}"
+        )
+
+
+@router.post("/advice", response_model=AdviceResponse)
+async def get_advice(request: AdviceRequest):
+    """
+    Get cooking/food advice based on a question.
+
+    Uses the configured persona and optionally includes inventory context.
+    """
+    config = await get_effective_config()
+
+    # Check if Grocy is configured (for inventory context)
+    grocy_configured = bool(config.get("grocy_url") and config.get("grocy_api_key"))
+
+    # Initialize LLM client
+    llm_client = LLMClient(config["llm_api_url"], config["llm_api_key"], config["llm_model"])
+
+    try:
+        # Fetch inventory if configured and requested
+        inventory = {"available_items": [], "expiring_soon": []}
+        if grocy_configured and request.include_inventory:
+            grocy_client = GrocyClient(config["grocy_url"], config["grocy_api_key"])
+            try:
+                inventory = await grocy_client.format_inventory_for_llm(prioritize_expiring=False)
+            except Exception as e:
+                print(f"Warning: Could not fetch Grocy inventory: {e}")
+
+        # Get active dietary profiles
+        dietary_profiles = []
+        if request.active_profiles:
+            all_profiles = await db.get_all_profiles()
+            dietary_profiles = [
+                {
+                    "name": p["name"],
+                    "dietary_restrictions": p["dietary_restrictions"]
+                }
+                for p in all_profiles
+                if p["name"] in request.active_profiles
+            ]
+
+        # Build request params
+        request_params = {
+            "elzar_voice": request.elzar_voice,
+            "custom_persona": config.get("custom_persona", "You are a professional chef and nutritionist."),
+            "unit_preference": config.get("unit_preference", "imperial")
+        }
+
+        # Fetch user preferences
+        user_preferences = await get_user_preferences_text()
+
+        # Generate advice
+        advice_text = await llm_client.generate_advice(
+            question=request.question,
+            inventory=inventory,
+            request_params=request_params,
+            dietary_profiles=dietary_profiles,
+            user_preferences=user_preferences
+        )
+
+        return AdviceResponse(
+            question=request.question,
+            advice=advice_text,
+            llm_model=config["llm_model"]
+        )
+
+    except Exception as e:
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=f"Error generating advice: {str(e)}"
         )
 
 
@@ -180,15 +290,20 @@ async def regenerate_recipe(recipe_id: int):
             "calories_per_serving": original["calories_per_serving"],
             "use_external_ingredients": original["used_external_ingredients"],
             "prioritize_expiring": original["prioritize_expiring"],
-            "user_prompt": original["user_prompt"]
+            "user_prompt": original["user_prompt"],
+            "custom_persona": config.get("custom_persona", "You are a professional chef and nutritionist.")
         }
-        
+
+        # Fetch user preferences
+        user_preferences = await get_user_preferences_text()
+
         # Regenerate with the LLM
         recipe_text = await llm_client.regenerate_recipe(
             previous_recipe=original["recipe_text"],
             inventory=inventory,
             request_params=request_params,
-            dietary_profiles=dietary_profiles
+            dietary_profiles=dietary_profiles,
+            user_preferences=user_preferences
         )
         
         # Extract metadata
@@ -224,6 +339,7 @@ async def regenerate_recipe(recipe_id: int):
             effort_level=saved_recipe["effort_level"],
             dish_preference=saved_recipe["dish_preference"],
             calories_per_serving=saved_recipe["calories_per_serving"],
+            estimated_cost=saved_recipe.get("estimated_cost"),
             used_external_ingredients=saved_recipe["used_external_ingredients"],
             prioritize_expiring=saved_recipe["prioritize_expiring"],
             active_profiles=saved_recipe["active_profiles"],
@@ -256,6 +372,7 @@ async def get_recipe(recipe_id: int):
         effort_level=recipe["effort_level"],
         dish_preference=recipe["dish_preference"],
         calories_per_serving=recipe["calories_per_serving"],
+        estimated_cost=recipe.get("estimated_cost"),
         used_external_ingredients=recipe["used_external_ingredients"],
         prioritize_expiring=recipe["prioritize_expiring"],
         active_profiles=recipe["active_profiles"],
@@ -282,6 +399,7 @@ async def download_recipe(recipe_id: int):
         "time_minutes": recipe["time_minutes"],
         "effort_level": recipe["effort_level"],
         "calories_per_serving": recipe["calories_per_serving"],
+        "estimated_cost": recipe.get("estimated_cost"),
         "active_profiles": json.loads(recipe["active_profiles"]) if recipe["active_profiles"] else []
     }
     
@@ -353,16 +471,17 @@ async def parse_recipe_ingredients(recipe_id: int, action_type: str = "consume")
     """
     Parse recipe ingredients and match them to Grocy products.
     Returns parsed items for user review before taking action.
-    
+
     Args:
         action_type: 'consume', 'shopping', or 'save' - affects quantity conversion
-    
+
     Similar to inventory parsing, this allows users to:
     - Review matched items
     - Create missing products
     - Adjust quantities/units
     - Then proceed with consume/shopping list/save actions
     """
+    await require_grocy_configured()
     config = await get_effective_config()
     
     # Get recipe
@@ -495,13 +614,14 @@ async def parse_recipe_ingredients(recipe_id: int, action_type: str = "consume")
 async def consume_recipe_ingredients(recipe_id: int):
     """
     Extract ingredients from recipe and consume them from Grocy stock
-    
+
     This endpoint:
     1. Gets the recipe from database
     2. Uses LLM to extract and match ingredients
     3. Consumes matched ingredients from stock
     4. Returns summary of what was consumed
     """
+    await require_grocy_configured()
     config = await get_effective_config()
     
     # Get recipe
@@ -600,13 +720,14 @@ async def consume_recipe_ingredients(recipe_id: int):
 async def add_missing_to_shopping_list(recipe_id: int):
     """
     Extract ingredients from recipe and add missing ones to Grocy shopping list
-    
+
     This endpoint:
     1. Gets the recipe from database
     2. Uses LLM to extract and match ingredients
     3. Adds missing/insufficient ingredients to shopping list
     4. Returns summary of what was added
     """
+    await require_grocy_configured()
     config = await get_effective_config()
     
     # Get recipe
@@ -697,7 +818,7 @@ async def add_missing_to_shopping_list(recipe_id: int):
 async def save_recipe_to_grocy(recipe_id: int):
     """
     Save recipe to Grocy as a recipe entity with linked ingredients
-    
+
     This endpoint:
     1. Gets the recipe from database
     2. Uses LLM to extract and match ingredients
@@ -705,6 +826,7 @@ async def save_recipe_to_grocy(recipe_id: int):
     4. Links ingredients to the recipe
     5. Returns Grocy recipe ID
     """
+    await require_grocy_configured()
     config = await get_effective_config()
     
     # Get recipe
@@ -834,7 +956,7 @@ async def save_recipe_to_grocy(recipe_id: int):
 async def save_recipe_to_grocy_reviewed(recipe_id: int, request: InventoryActionRequest):
     """
     Save recipe to Grocy with reviewed ingredients
-    
+
     This endpoint:
     1. Gets the recipe from database
     2. Uses LLM to format the recipe cleanly
@@ -843,6 +965,7 @@ async def save_recipe_to_grocy_reviewed(recipe_id: int, request: InventoryAction
     5. Links reviewed ingredients to the recipe
     6. Returns Grocy recipe ID and summary
     """
+    await require_grocy_configured()
     config = await get_effective_config()
     
     # Get recipe

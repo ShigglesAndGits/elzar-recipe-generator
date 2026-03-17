@@ -1,7 +1,7 @@
 from fastapi import APIRouter, HTTPException, Query, status
 from typing import List, Optional
 
-from ..models import RecipeResponse, RecipeFilter
+from ..models import RecipeResponse, RecipeFilter, ManualRecipeCreate
 from ..database import db
 
 router = APIRouter(prefix="/api/history", tags=["history"])
@@ -61,7 +61,11 @@ async def get_recipe_history(
             prioritize_expiring=recipe["prioritize_expiring"],
             active_profiles=recipe["active_profiles"],
             created_at=recipe["created_at"],
-            llm_model=recipe["llm_model"]
+            llm_model=recipe["llm_model"],
+            is_locked=bool(recipe.get("is_locked")),
+            is_saved=bool(recipe.get("is_saved")),
+            tags=recipe.get("tags", "[]"),
+            parent_recipe_id=recipe.get("parent_recipe_id"),
         )
         for recipe in recipes
     ]
@@ -86,4 +90,63 @@ async def get_recipe_count():
     """Get total count of recipes in history"""
     recipes = await db.get_recipes(limit=10000, offset=0)
     return {"count": len(recipes)}
+
+
+@router.post("/{recipe_id}/lock")
+async def toggle_recipe_lock(recipe_id: int):
+    """Toggle lock status on a recipe"""
+    result = await db.toggle_recipe_locked(recipe_id)
+    if result is None:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Recipe not found"
+        )
+    return {"id": recipe_id, "is_locked": result}
+
+
+@router.post("/{recipe_id}/save")
+async def toggle_recipe_save(recipe_id: int):
+    """Toggle saved/bookmarked status on a recipe"""
+    result = await db.toggle_recipe_saved(recipe_id)
+    if result is None:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Recipe not found"
+        )
+    return {"id": recipe_id, "is_saved": result}
+
+
+@router.post("/create", response_model=RecipeResponse)
+async def create_manual_recipe(request: ManualRecipeCreate):
+    """Manually create a recipe (family recipes, copied from elsewhere, etc.)"""
+    recipe_id = await db.create_manual_recipe({
+        "recipe_text": request.recipe_text,
+        "cuisine": request.cuisine,
+        "time_minutes": request.time_minutes,
+        "effort_level": request.effort_level,
+        "calories_per_serving": request.calories_per_serving,
+        "is_locked": request.is_locked,
+        "is_saved": request.is_saved,
+    })
+
+    recipe = await db.get_recipe(recipe_id)
+
+    return RecipeResponse(
+        id=recipe["id"],
+        recipe_text=recipe["recipe_text"],
+        cuisine=recipe["cuisine"],
+        time_minutes=recipe["time_minutes"],
+        effort_level=recipe["effort_level"],
+        dish_preference=recipe.get("dish_preference"),
+        calories_per_serving=recipe["calories_per_serving"],
+        used_external_ingredients=bool(recipe.get("used_external_ingredients")),
+        prioritize_expiring=bool(recipe.get("prioritize_expiring")),
+        active_profiles=recipe.get("active_profiles"),
+        created_at=recipe["created_at"],
+        llm_model=recipe.get("llm_model"),
+        is_locked=bool(recipe.get("is_locked")),
+        is_saved=bool(recipe.get("is_saved")),
+        tags=recipe.get("tags", "[]"),
+        parent_recipe_id=recipe.get("parent_recipe_id"),
+    )
 

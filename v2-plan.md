@@ -1,0 +1,211 @@
+# Elzar v2 Plan: Conversational Meal Planning & Batch Cook Workflow
+
+This is the revised implementation plan, incorporating decisions from design review.
+See `enhancement-request.md` for the original feature descriptions.
+
+---
+
+## Key Design Decisions
+
+These decisions override or refine the original enhancement request:
+
+**Chat is the landing page.** Not just another nav item — Chat replaces the current
+Generator as the default view. The Generator stays as a "Quick Recipe" shortcut in the
+nav for one-off use. The standalone Meal Planner page is retired; meal planning
+(weekly and batch cook) happens through Chat and Prep Cook Sessions.
+
+**Ideas list is a Chat sidebar.** Not a separate nav item. Ideas live in a collapsible
+sidebar panel within the Chat page, accessible via tool calls and direct UI interaction.
+This keeps navigation lean and ideas contextually close to where they're discussed.
+
+**Freezer inventory is Grocy-only.** No standalone SQLite fallback for inventory tracking.
+Users who want freezer/inventory features need Grocy configured. This avoids building a
+parallel inventory system and keeps Grocy as the single source of truth for stock.
+
+**No tool-call fallback for non-capable models.** Instead of building a structured-JSON
+fallback parser, add a clear disclaimer in Settings (under model configuration) that the
+Chat feature requires a model with tool/function call support. The Generator and other
+form-driven features continue to work with any model.
+
+**Chat gets collapsible parameter controls.** A collapsible header at the top of the Chat
+page with sliders/checkboxes similar to the Generator (cuisine, effort, servings, calorie
+target, equipment, etc.). These set defaults for the session — the LLM uses them as
+context when generating recipes, but the user can override via conversation.
+
+**Preference document stays lean (~2000 tokens max).** The user preference profile is
+injected into every LLM prompt. To avoid eating context window on smaller models, the UI
+should guide users toward concise, high-signal descriptions rather than exhaustive lists.
+
+---
+
+## Navigation (Post-v2)
+
+```
+Chat (landing page, 💬)
+Quick Recipe (Generator, ⚡)
+Inventory (Grocy import, 📦) — hidden when Grocy not configured
+History (📜)
+Profiles (👤)
+Settings (⚙️)
+```
+
+The Meal Planner nav item is removed. Prep Cook Sessions are accessible from Chat
+(via conversation or a dedicated "New Batch Cook" action) and browsable from History.
+
+---
+
+## Implementation Order
+
+Build bottom-up so each feature is fully functional when shipped. Chat is the capstone
+that ties everything together — by the time we build it, all the tools have real
+services behind them.
+
+### Phase 1: Foundations
+
+**1. User Preference Profile** (enhancement #7) — COMPLETED, SIMPLIFIED
+- Merged preferences into the existing per-person profiles (renamed "Preferences & Restrictions")
+  instead of a separate document. Each person's profile now covers dietary restrictions AND
+  cooking style, likes/dislikes, calorie goals, etc.
+- Added a "Household Preferences" field (always-on, injected into every prompt) for shared
+  context: where you shop, kitchen quirks, cooking schedule, food philosophy.
+- Backend: `user_preferences` table (single-row document) + API at `/api/preferences`
+- Frontend: Compact textarea on the Profiles page above person profiles
+- Injected into all LLM prompts (recipe, meal plan, advice, regeneration)
+
+**2. Recipe Locking & Saving** (enhancement #12) — COMPLETED
+- New DB columns on `recipes`: `is_locked`, `is_saved` (bookmarked), `tags`, `parent_recipe_id`
+- Lock/unlock toggle (🔒/🔓) in recipe display and History list
+- Locked recipes: disable Regenerate button, show badge in History
+- Saved/bookmarked recipes (and locked): exempt from `cleanup_old_recipes`
+- Manual recipe entry: "+ Add Recipe" button in History header
+- **Tags**: DB column added now (JSON text), but full tag management UI deferred to
+  Ideas List (#3) or Chat. Tags and Ideas are closely related — building a tagging UI
+  here and then rebuilding it for Ideas would be redundant. For now, tags are stored
+  but not exposed in the UI.
+- **Variant linking**: `parent_recipe_id` column added now. Simple "Based on: #N" display
+  in recipe detail view. Full variant tree UI (parent shows list of variants, etc.)
+  deferred to Chat's `copy_and_edit_recipe` tool, which is the primary way variants
+  get created. No point building a variant browser before the creation mechanism exists.
+
+**3. Ideas List** (enhancement #3)
+- New `ideas` table: id, name, notes, tags (JSON), calorie_estimate_range, status
+  (idea/planned/tested/favorite), created_at, updated_at
+- API endpoints: full CRUD + search/filter
+- UI: Built as a sidebar panel (will live in Chat page later; for now, accessible from
+  a temporary standalone route or the Profiles page during development)
+- Inline editing, tag toggles, status transitions
+- "Promote to recipe" action (pre-fills Generator)
+
+### Phase 2: Inventory & Batch Cooking
+
+**4. Freezer Inventory Tracking** (enhancement #5) — Grocy-only
+- Read/write Grocy's freezer location for prepped meals
+- Dashboard view: meal name, portions remaining, date frozen, cal/portion
+- Log portions from completed prep cook sessions
+- Consume/decrement portions
+- "What's running low" query support
+- UI: Section within Inventory Manager page
+- When Grocy is not configured, this entire section is hidden
+
+**5. Prep Cook Sessions** (enhancement #2)
+- New DB tables: `prep_cook_sessions`, `prep_cook_recipes`
+- Session definition: date, target meals, portions per meal, shared protein anchor
+- LLM generates: recipes with portion counts, unified prep day timeline, reheating
+  instructions, total yield summary
+- Controls: number of meals, portions/meal, portion size, protein anchor, calorie
+  target, equipment checklist
+- Session history browsable from History page (or dedicated sub-view)
+- Aggregated shopping list generation (feeds into #6)
+
+**6. Shopping List Enhancements** (enhancement #8)
+- Aggregate ingredients across all recipes in a prep cook session
+- Deduplicate and sum quantities
+- Subtract on-hand inventory (Grocy) + bulk prep inventory
+- Group by store section: PRODUCE & REFRIGERATED, PROTEINS, PANTRY, FROZEN, ALREADY HAVE
+- Plain text output optimized for text message copy/paste
+- 📋 Copy to Clipboard button — prominent, one-click
+- Works without Grocy (skips "subtract on hand" step, no "ALREADY HAVE" section)
+- Chat tool call: `generate_shopping_list(recipe_ids[])`
+
+### Phase 3: Conversational Interface
+
+**7. Chat Interface** (enhancement #1)
+- New DB tables: `chat_sessions`, `chat_messages`
+- Full multi-turn chat with persistent message history across sessions
+- Session list sidebar: name, browse, resume past sessions
+- Collapsible parameter controls at top (cuisine, effort, servings, calories, equipment, etc.)
+- SSE streaming for LLM responses (FastAPI StreamingResponse, frontend fetch-with-reader)
+- Spice Weasel personality toggle
+- System prompt includes: user preferences, Grocy inventory summary (if configured),
+  freezer summary (if configured), ideas list, session context
+- LLM tool calls:
+  **Read/Query:** `get_recipe`, `search_recipes`, `get_ideas_list`, `query_inventory`,
+  `query_freezer`, `get_user_preferences`, `get_prep_cook_session`, `get_debriefs`
+  **Create:** `create_recipe`, `create_prep_cook_session`, `generate_shopping_list`,
+  `add_to_ideas_list`, `log_debrief`
+  **Edit:** `edit_recipe`, `copy_and_edit_recipe`, `update_ideas_list`,
+  `update_user_preferences`
+- Preference prompting: LLM must ASK before calling `update_user_preferences`
+- Settings disclaimer: model must support tool/function calls for Chat to work
+- This becomes the app's landing page
+
+**8. Iterative Recipe Editing** (enhancement #4)
+- `edit_recipe(id, instructions)` tool call — surgical changes preserving the rest
+- Bulk edits across multiple recipes in one request
+- Edit history: `last_edited` timestamp, optional diff view
+- Respects lock status — locked recipes use `copy_and_edit_recipe` to fork a variant
+- The existing Regenerate button (🔄) remains for full regeneration
+
+### Phase 4: Polish & Enhancement
+
+**9. Grocy-Free Experience Audit** (enhancement #13)
+- Thorough pass through every page: hide all Grocy-dependent UI when unconfigured
+- Generator: hide Consume, Add Missing, Save to Grocy buttons
+- History: hide Grocy action buttons
+- Settings: collapse Grocy config into expandable "Connect Grocy" section
+- Chat: disable inventory/freezer tool calls, adjust system prompt
+- Goal: clean, complete experience with no dead buttons or "configure Grocy" prompts
+
+**10. Post-Session Debrief** (enhancement #10)
+- Prompted debrief after prep cook sessions or configurable period
+- Questions: what was eaten vs. planned, what got skipped/wasted, what worked
+- Stored and surfaced to LLM in future planning sessions
+- Chat tool call: `log_debrief`
+- Feedback loop: plan → cook → eat → debrief → better plan
+
+**11. Bulk Ingredient Prep Tracking** (enhancement #6)
+- Track pre-made base ingredients (garlic blend, caramelized onions, etc.)
+- Shopping list generation accounts for bulk prep inventory
+- Recipes can reference bulk ingredients
+- Low-stock reminders
+
+**12. Opportunistic Batching Suggestions** (enhancement #9)
+- Chat behavior: detect equipment use or upcoming cooks, suggest piggybacking
+- Factor in ideas list, freezer gaps, available equipment
+- Combined prep plans layering opportunistic work into existing cooks
+
+**13. Nutritional Awareness Dashboard** (enhancement #11)
+- Per-portion calorie/macro estimates
+- Freezer-wide nutritional summary
+- Gap flagging (low fiber, heavy sodium, etc.)
+- Daily calorie planning across multiple meals
+
+---
+
+## Technical Notes
+
+**Database migrations:** The current approach uses inline ALTER TABLE statements in
+`database.py`. New tables (ideas, chat_sessions, chat_messages, prep_cook_sessions,
+prep_cook_recipes) follow this pattern. New columns on `recipes` (is_locked, is_saved,
+tags, parent_recipe_id) added via ALTER TABLE with defaults.
+
+**Streaming:** Chat requires SSE for good UX. Backend uses FastAPI `StreamingResponse`.
+Frontend uses `fetch` with `ReadableStream` reader (not Axios, which doesn't support SSE).
+
+**Tool call execution loop:** When the LLM returns tool calls, the backend executes them,
+sends results back to the LLM, and streams the final response. This loop runs server-side
+to keep the frontend simple.
+
+**Context management:** The Chat system prompt grows with preferences, inventory, ideas,
+and session context. Monitor total token usage and implement summarization or truncation
+strategies if context gets too large for smaller models.

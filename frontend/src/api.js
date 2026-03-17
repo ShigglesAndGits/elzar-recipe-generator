@@ -42,6 +42,18 @@ export const regenerateRecipe = async (recipeId) => {
   return response.data;
 };
 
+export const getAdvice = async (question, activeProfiles = [], elzarVoice = false, includeInventory = true) => {
+  const response = await api.post('/api/recipes/advice', {
+    question,
+    active_profiles: activeProfiles,
+    elzar_voice: elzarVoice,
+    include_inventory: includeInventory
+  }, {
+    timeout: 120000  // 2 minute timeout
+  });
+  return response.data;
+};
+
 export const getRecipe = async (recipeId) => {
   const response = await api.get(`/api/recipes/${recipeId}`);
   return response.data;
@@ -75,6 +87,21 @@ export const getRecipeCount = async () => {
   return response.data;
 };
 
+export const toggleRecipeLock = async (recipeId) => {
+  const response = await api.post(`/api/history/${recipeId}/lock`);
+  return response.data;
+};
+
+export const toggleRecipeSave = async (recipeId) => {
+  const response = await api.post(`/api/history/${recipeId}/save`);
+  return response.data;
+};
+
+export const createManualRecipe = async (recipeData) => {
+  const response = await api.post('/api/history/create', recipeData);
+  return response.data;
+};
+
 // Profile APIs
 export const getAllProfiles = async () => {
   const response = await api.get('/api/profiles/');
@@ -101,7 +128,23 @@ export const deleteProfile = async (profileId) => {
   return response.data;
 };
 
+// User Preferences APIs
+export const getUserPreferences = async () => {
+  const response = await api.get('/api/preferences/');
+  return response.data;
+};
+
+export const updateUserPreferences = async (content) => {
+  const response = await api.put('/api/preferences/', { content });
+  return response.data;
+};
+
 // Settings APIs
+export const getServiceStatus = async () => {
+  const response = await api.get('/api/settings/status');
+  return response.data;
+};
+
 export const getConfig = async () => {
   const response = await api.get('/api/settings/config');
   return response.data;
@@ -140,6 +183,21 @@ export const testLLMConnection = async () => {
 // Inventory APIs (v1.1)
 export const parseInventoryText = async (text, actionType) => {
   const response = await api.post('/api/inventory/parse', { text, action_type: actionType });
+  return response.data;
+};
+
+export const scanPantryImages = async (files) => {
+  const formData = new FormData();
+  files.forEach((file) => {
+    formData.append('files', file);
+  });
+
+  const response = await api.post('/api/inventory/scan', formData, {
+    headers: {
+      'Content-Type': 'multipart/form-data',
+    },
+    timeout: 180000, // 3 minute timeout for vision processing
+  });
   return response.data;
 };
 
@@ -196,6 +254,63 @@ export const setupUnitConversions = async () => {
 
 export const setupLocations = async () => {
   const response = await api.post('/api/settings/grocy/setup-locations');
+  return response.data;
+};
+
+// Meal Planning APIs (v1.2)
+export const generateMealPlan = async (params) => {
+  const response = await api.post('/api/mealplans/generate', params, {
+    timeout: 300000, // 5 minute timeout for large meal plans
+  });
+  return response.data;
+};
+
+export const getMealPlans = async (limit = 20, offset = 0) => {
+  const response = await api.get('/api/mealplans/', { params: { limit, offset } });
+  return response.data;
+};
+
+export const getMealPlan = async (mealPlanId) => {
+  const response = await api.get(`/api/mealplans/${mealPlanId}`);
+  return response.data;
+};
+
+export const deleteMealPlan = async (mealPlanId) => {
+  const response = await api.delete(`/api/mealplans/${mealPlanId}`);
+  return response.data;
+};
+
+export const getMealPlanRecipe = async (mealPlanId, recipeId) => {
+  const response = await api.get(`/api/mealplans/${mealPlanId}/recipes/${recipeId}`);
+  return response.data;
+};
+
+export const regenerateMealPlanRecipe = async (mealPlanId, recipeId) => {
+  const response = await api.post(`/api/mealplans/${mealPlanId}/recipes/${recipeId}/regenerate`, {}, {
+    timeout: 120000, // 2 minute timeout for regeneration
+  });
+  return response.data;
+};
+
+export const parseMealPlanRecipeIngredients = async (mealPlanId, recipeId, actionType = 'consume') => {
+  const response = await api.post(
+    `/api/mealplans/${mealPlanId}/recipes/${recipeId}/parse-ingredients?action_type=${actionType}`
+  );
+  return response.data;
+};
+
+export const consumeMealPlanRecipeIngredients = async (mealPlanId, recipeId) => {
+  const response = await api.post(`/api/mealplans/${mealPlanId}/recipes/${recipeId}/consume-ingredients`);
+  return response.data;
+};
+
+export const addMealPlanRecipeMissingToShoppingList = async (mealPlanId, recipeId) => {
+  const response = await api.post(`/api/mealplans/${mealPlanId}/recipes/${recipeId}/add-missing-to-shopping-list`);
+  return response.data;
+};
+
+export const saveMealPlanRecipeToGrocy = async (mealPlanId, recipeId) => {
+  const response = await api.post(`/api/mealplans/${mealPlanId}/recipes/${recipeId}/save-to-grocy`);
   return response.data;
 };
 

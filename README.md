@@ -6,7 +6,7 @@
 
 Elzar is a self-hosted web application that generates creative recipes based on your [Grocy](https://grocy.info/) inventory using AI. Named after the famous chef from Futurama, Elzar brings personality and intelligence to your kitchen!
 
-![Version](https://img.shields.io/badge/version-1.1.0-blue)
+![Version](https://img.shields.io/badge/version-1.2.0-blue)
 ![License](https://img.shields.io/badge/license-MIT-green)
 ![Python](https://img.shields.io/badge/python-3.9+-blue)
 ![React](https://img.shields.io/badge/react-18+-61dafb)
@@ -32,10 +32,10 @@ Elzar is a self-hosted web application that generates creative recipes based on 
   - **OFF**: Clean, professional recipe format (ingredients + instructions only)
 - Recipes include calorie counts, servings, and prep time at the top
 
-### 🥗 Dietary Management
-- **User Profiles**: Create profiles for household members with dietary restrictions
-- **Toggle-Based Selection**: Enable/disable profiles to include their restrictions in recipe generation
-- Restrictions are automatically fed to the AI for safe, appropriate recipes
+### 🥗 Profiles & Preferences
+- **Household Preferences**: Shared preferences applied to every recipe and meal plan — where you shop, kitchen quirks, cooking schedule, food philosophy. Always active.
+- **Person Profiles**: Per-person preferences and dietary restrictions in one place — allergies, food likes/dislikes, cooking style, calorie goals. Toggled on/off per recipe on the Generator page.
+- The more detail you provide, the better the AI tailors recipes to your household
 
 ### 📦 Inventory Manager (v1.1)
 - **Bulk Import**: Paste shopping receipts or ingredient lists
@@ -76,11 +76,42 @@ Three powerful buttons on every generated recipe:
   - **Storage Locations**: Sets up Pantry and Fridge locations
 - **API Configuration**: Edit Grocy URL/Key, LLM URL/Key/Model via UI
 
-### 📜 Recipe History
-- Browse previously generated recipes
-- Regenerate recipes with one click
-- View recipe metadata (cuisine, time, effort, etc.)
-- Persistent storage in SQLite
+### 📅 Meal Planner (v1.2)
+- **Multi-Day Planning**: Plan meals for 1-14 days
+- **Flexible Meal Types**: Toggle breakfast, lunch, dinner, snacks
+- **Time-Based Cooking**: Choose from Instant to All-Day cooking times
+- **Budget Control**: From "I'm Broke" to "Luxury" budget levels
+- **Calorie Targets**: Set daily calorie goals
+- **Variety Slider**: Balance ingredient reuse vs. unique meals
+- **Per-Recipe Actions**:
+  - Regenerate individual recipes
+  - Consume ingredients from Grocy
+  - Add missing items to shopping list
+  - Save recipes to Grocy
+
+### 📜 Recipe History & Management
+- Browse previously generated recipes with filters (cuisine, time, effort, search)
+- **Recipe Locking**: Lock recipes to prevent accidental deletion or regeneration (🔒). Family recipes, finalized favorites, etc.
+- **Save/Bookmark**: Star recipes (⭐) to protect them from automatic history cleanup
+- **Manual Recipe Entry**: Add your own recipes via "+ Add Recipe" — family recipes, copied from elsewhere, or handwritten
+- **Variant Linking**: Recipes created as variants show "Based on" reference to the original
+- Locked and saved recipes are exempt from the automatic cleanup that trims old history
+- View recipe metadata (cuisine, time, effort, cost, calories, model used)
+
+### 📱 Kiosk Mode (v1.2)
+- **Touchscreen Optimized**: Large buttons and simplified navigation
+- **Raspberry Pi Ready**: Perfect for kitchen displays
+- **Toggle in Settings**: Enable/disable via Settings page
+
+### 🎭 Custom Personas (v1.2)
+- **Customizable Chef Personality**: Set your own AI persona
+- **Layered with Elzar**: Elzar's "Spice Weasel" flair adds on top of your custom persona
+- **Examples**: Budget-conscious cook, nutritionist, quick-meal specialist
+
+### ⚡ Configurable Token Limits (v1.2)
+- **Max Output Tokens**: Configure in Settings for longer meal plans
+- **Default 16,000 tokens**: Supports large 14-day meal plans
+- **Up to 128,000 tokens**: For models that support extended output
 
 ### 📱 Notifications (Planned)
 - Send recipes to your phone via Apprise
@@ -124,6 +155,7 @@ elzar-recipe-generator/
 │   ├── src/
 │   │   ├── pages/
 │   │   │   ├── Generator.jsx          # Main recipe generation page
+│   │   │   ├── MealPlanner.jsx        # Multi-day meal planning (v1.2)
 │   │   │   ├── InventoryManager.jsx   # Bulk inventory management
 │   │   │   ├── History.jsx            # Recipe history browser
 │   │   │   ├── Profiles.jsx           # Dietary profile management
@@ -304,6 +336,7 @@ LLM_API_KEY=your_api_key
 LLM_MODEL=gpt-4
 
 # Optional
+LLM_MAX_TOKENS=16000               # Max output tokens (increase for large meal plans)
 MAX_RECIPE_HISTORY=50              # Number of recipes to keep
 APPRISE_URL=                       # Notification service URL
 UNIT_PREFERENCE=imperial           # imperial or metric
@@ -313,8 +346,11 @@ UNIT_PREFERENCE=imperial           # imperial or metric
 Settings can be overridden via the Settings page:
 - Grocy URL and API Key
 - LLM API URL, Key, and Model
+- Max output tokens (for longer meal plans)
+- Custom chef persona
 - Unit preference
 - Max recipe history
+- Kiosk mode toggle
 
 Changes take effect immediately without restart.
 
@@ -367,16 +403,20 @@ tail -f /root/elzar-recipe-generator/frontend.log
 - [x] Bulk inventory management (v1.1)
 - [x] Recipe integration (consume, shopping list, save) (v1.1)
 - [x] Unit and location setup automation (v1.1)
+- [x] Docker Compose deployment (v1.2)
+- [x] Meal planner with multi-day planning (v1.2)
+- [x] Kiosk mode for touchscreens (v1.2)
+- [x] Custom chef personas (v1.2)
+- [x] Configurable max token limits (v1.2)
+- [x] Time-based cooking preferences (v1.2)
 
 ### Planned 🚧
-- [ ] Kiosk mode for Raspberry Pi touchscreen
-- [ ] Mobile-optimized UI
+- [ ] Mobile-optimized UI improvements
 - [ ] Recipe notifications via Apprise
-- [ ] Docker Compose deployment
 - [ ] Multi-language support
 - [ ] Recipe rating system
-- [ ] Meal planning calendar
 - [ ] Nutrition tracking
+- [ ] Meal plan export/sharing
 
 ## 🤝 Contributing
 

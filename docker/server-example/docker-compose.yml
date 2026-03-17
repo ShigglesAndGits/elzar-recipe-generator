@@ -1,0 +1,46 @@
+# Elzar - Server Deployment Example
+#
+# This file goes on your SERVER to pull and run the image
+# from your local machine's private registry.
+#
+# Prerequisites:
+#   1. Registry running on your dev machine (see docker-images/docker-compose.yml)
+#   2. Image built and pushed (./build-and-push.sh)
+#   3. Configure Docker on this server to allow insecure registry (see below)
+#
+# Usage:
+#   cp .env.example .env
+#   nano .env  # Fill in your credentials
+#   docker compose up -d
+
+services:
+  elzar:
+    # Replace YOUR_DEV_MACHINE_IP with your dev machine's LAN IP
+    # Example: 192.168.1.100:5000/elzar:latest
+    image: ${REGISTRY_HOST:-192.168.1.100}:5000/elzar:latest
+    container_name: elzar
+    restart: unless-stopped
+    ports:
+      - "${ELZAR_PORT:-80}:80"
+    environment:
+      # Grocy Configuration (Required)
+      - GROCY_URL=${GROCY_URL}
+      - GROCY_API_KEY=${GROCY_API_KEY}
+
+      # LLM Configuration (Required)
+      - LLM_API_URL=${LLM_API_URL}
+      - LLM_API_KEY=${LLM_API_KEY}
+      - LLM_MODEL=${LLM_MODEL}
+
+      # Optional Settings
+      - MAX_RECIPE_HISTORY=${MAX_RECIPE_HISTORY:-50}
+      - APPRISE_URL=${APPRISE_URL:-}
+      - UNIT_PREFERENCE=${UNIT_PREFERENCE:-imperial}
+    volumes:
+      - ./data:/app/data
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 15s

@@ -3,7 +3,7 @@ from fastapi.middleware.cors import CORSMiddleware
 from contextlib import asynccontextmanager
 
 from .database import db
-from .routers import recipes, history, profiles, preferences, ideas, settings, inventory, mealplans, prepcook
+from .routers import recipes, history, profiles, preferences, ideas, settings, inventory, mealplans, prepcook, chat
 
 
 @asynccontextmanager
@@ -21,7 +21,7 @@ async def lifespan(app: FastAPI):
 app = FastAPI(
     title="Elzar - Grocy Recipe Generator",
     description="BAM! Generate amazing recipes from your Grocy inventory! 🌶️",
-    version="1.1.0",
+    version="2.0.0",
     lifespan=lifespan
 )
 
@@ -44,6 +44,7 @@ app.include_router(settings.router)
 app.include_router(inventory.router)
 app.include_router(mealplans.router)
 app.include_router(prepcook.router)
+app.include_router(chat.router)
 
 
 @app.get("/")

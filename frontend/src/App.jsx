@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { BrowserRouter as Router, Routes, Route, Link, useLocation } from 'react-router-dom';
+import Chat from './pages/Chat';
 import Generator from './pages/Generator';
 import MealPlanner from './pages/MealPlanner';
 import History from './pages/History';
@@ -38,12 +39,11 @@ function Navigation() {
 
   // Base nav items - Inventory only shown when Grocy is configured
   const allNavItems = [
-    { path: '/', label: 'Generator', icon: '🍳' },
-    { path: '/meal-planner', label: 'Meal Planner', icon: '📅' },
+    { path: '/', label: 'Chat', icon: '💬' },
+    { path: '/generator', label: 'Quick Recipe', icon: '⚡' },
     { path: '/inventory', label: 'Inventory', icon: '📦', requiresGrocy: true },
-    { path: '/ideas', label: 'Ideas', icon: '💡' },
     { path: '/history', label: 'History', icon: '📜' },
-    { path: '/profiles', label: 'Profiles', icon: '👥' },
+    { path: '/profiles', label: 'Profiles', icon: '👤' },
     { path: '/settings', label: 'Settings', icon: '⚙️' },
   ];
 
@@ -51,7 +51,8 @@ function Navigation() {
   const navItems = allNavItems.filter(item => !item.requiresGrocy || grocyConfigured);
 
   const kioskNavItems = [
-    { path: '/', label: 'BAM!', icon: '🍳' },
+    { path: '/', label: 'Chat', icon: '💬' },
+    { path: '/generator', label: 'BAM!', icon: '⚡' },
     { path: '/history', label: 'History', icon: '📜' },
   ];
 
@@ -155,7 +156,8 @@ function AppContent() {
       <Navigation />
       <main className="container mx-auto px-4 py-6">
         <Routes>
-          <Route path="/" element={<Generator />} />
+          <Route path="/" element={<Chat />} />
+          <Route path="/generator" element={<Generator />} />
           <Route path="/meal-planner" element={<MealPlanner />} />
           <Route path="/inventory" element={<InventoryManager />} />
           <Route path="/ideas" element={<Ideas />} />

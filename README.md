@@ -6,14 +6,23 @@
 
 Elzar is a self-hosted web application that generates creative recipes based on your [Grocy](https://grocy.info/) inventory using AI. Named after the famous chef from Futurama, Elzar brings personality and intelligence to your kitchen!
 
-![Version](https://img.shields.io/badge/version-1.2.0-blue)
+![Version](https://img.shields.io/badge/version-2.0.0-blue)
 ![License](https://img.shields.io/badge/license-MIT-green)
 ![Python](https://img.shields.io/badge/python-3.9+-blue)
 ![React](https://img.shields.io/badge/react-18+-61dafb)
 
 ## ✨ Features
 
-### 🍳 Recipe Generation
+### 💬 Chat Interface (v2.0) — Landing Page
+- **Conversational Meal Planning**: Chat with Elzar about recipes, meal plans, inventory, and ideas
+- **13 Tool Calls**: The AI can create recipes, search history, manage ideas, query inventory/freezer, create prep cook sessions, generate shopping lists, edit recipes, and manage preferences — all through natural conversation
+- **Session Management**: Persistent chat sessions with browse, resume, rename, and delete
+- **Collapsible Parameter Controls**: Same options as Quick Recipe (cuisine, effort, servings, calories, budget, equipment, profiles) available as session defaults in a compact header
+- **Spice Weasel Toggle**: Elzar's personality carries through the entire conversation
+- **Context-Aware**: System prompt includes user preferences, dietary profiles, Grocy inventory status, and session parameters
+- **Grocy-Aware**: Tool calls for inventory and freezer queries are automatically hidden when Grocy isn't configured
+
+### 🍳 Quick Recipe (Generator)
 - **Smart Inventory Integration**: Automatically pulls available ingredients from Grocy
 - **AI-Powered Creativity**: Uses OpenAI-compatible LLMs (OpenRouter, Ollama, etc.) to generate unique recipes
 - **Customizable Parameters**:
@@ -152,12 +161,14 @@ elzar-recipe-generator/
 │   │   ├── models.py                  # Pydantic models
 │   │   ├── database.py                # SQLite operations
 │   │   ├── routers/
+│   │   │   ├── chat.py                # Chat interface with tool calls (v2.0)
 │   │   │   ├── recipes.py             # Recipe generation & integration
 │   │   │   ├── inventory.py           # Inventory management (v1.1)
 │   │   │   ├── history.py             # Recipe history
 │   │   │   ├── profiles.py            # Dietary profiles
 │   │   │   ├── ideas.py               # Ideas brainstorm board
 │   │   │   ├── preferences.py         # Household preferences
+│   │   │   ├── prepcook.py            # Prep cook sessions (v2.0)
 │   │   │   └── settings.py            # Settings & testing
 │   │   ├── services/
 │   │   │   ├── grocy_client.py        # Grocy API client
@@ -171,7 +182,8 @@ elzar-recipe-generator/
 ├── frontend/
 │   ├── src/
 │   │   ├── pages/
-│   │   │   ├── Generator.jsx          # Main recipe generation page
+│   │   │   ├── Chat.jsx               # Chat interface — landing page (v2.0)
+│   │   │   ├── Generator.jsx          # Quick recipe generation
 │   │   │   ├── MealPlanner.jsx        # Multi-day meal planning (v1.2)
 │   │   │   ├── InventoryManager.jsx   # Bulk inventory management
 │   │   │   ├── Ideas.jsx              # Ideas brainstorm board
@@ -432,10 +444,13 @@ tail -f /root/elzar-recipe-generator/frontend.log
 - [x] Ideas brainstorm board (v2.0)
 - [x] Freezer inventory dashboard (v2.0)
 
+- [x] Chat interface with tool calls (v2.0)
+- [x] Prep cook session backend (v2.0)
+
 ### Planned 🚧
-- [ ] Chat interface (AI-powered landing page)
+- [ ] SSE streaming for chat responses
 - [ ] Iterative recipe editing via chat
-- [ ] Freezer inventory integration
+- [ ] Post-session debrief & feedback loop
 - [ ] Mobile-optimized UI improvements
 - [ ] Recipe notifications via Apprise
 - [ ] Nutritional dashboard

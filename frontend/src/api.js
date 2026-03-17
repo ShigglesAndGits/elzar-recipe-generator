@@ -369,4 +369,32 @@ export const deletePrepCookSession = async (sessionId) => {
   return response.data;
 };
 
+// Chat APIs (v2.0)
+export const sendChatMessage = async (params) => {
+  const response = await api.post('/api/chat/send', params, {
+    timeout: 180000, // 3 minute timeout for tool call loops
+  });
+  return response.data;
+};
+
+export const getChatSessions = async () => {
+  const response = await api.get('/api/chat/sessions');
+  return response.data;
+};
+
+export const getChatSession = async (sessionId) => {
+  const response = await api.get(`/api/chat/sessions/${sessionId}`);
+  return response.data;
+};
+
+export const renameChatSession = async (sessionId, name) => {
+  const response = await api.put(`/api/chat/sessions/${sessionId}/name`, { name });
+  return response.data;
+};
+
+export const deleteChatSession = async (sessionId) => {
+  const response = await api.delete(`/api/chat/sessions/${sessionId}`);
+  return response.data;
+};
+
 export default api;

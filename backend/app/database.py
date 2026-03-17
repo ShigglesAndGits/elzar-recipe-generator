@@ -209,6 +209,39 @@ class Database:
             except Exception:
                 pass  # Column already exists
 
+            # Chat sessions table
+            await db.execute("""
+                CREATE TABLE IF NOT EXISTS chat_sessions (
+                    id INTEGER PRIMARY KEY AUTOINCREMENT,
+                    name TEXT DEFAULT 'New Chat',
+                    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                    updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+                )
+            """)
+            await db.execute("""
+                CREATE INDEX IF NOT EXISTS idx_chat_sessions_updated_at
+                ON chat_sessions(updated_at DESC)
+            """)
+
+            # Chat messages table
+            await db.execute("""
+                CREATE TABLE IF NOT EXISTS chat_messages (
+                    id INTEGER PRIMARY KEY AUTOINCREMENT,
+                    session_id INTEGER NOT NULL,
+                    role TEXT NOT NULL,
+                    content TEXT,
+                    tool_calls TEXT,
+                    tool_call_id TEXT,
+                    name TEXT,
+                    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                    FOREIGN KEY (session_id) REFERENCES chat_sessions(id) ON DELETE CASCADE
+                )
+            """)
+            await db.execute("""
+                CREATE INDEX IF NOT EXISTS idx_chat_messages_session_id
+                ON chat_messages(session_id)
+            """)
+
             await db.commit()
     
     # Recipe operations
@@ -679,6 +712,114 @@ class Database:
             )
             await db.commit()
             return cursor.rowcount > 0
+
+    # Chat operations
+    async def create_chat_session(self, name: str = "New Chat") -> int:
+        """Create a new chat session"""
+        async with aiosqlite.connect(self.db_path) as db:
+            cursor = await db.execute(
+                "INSERT INTO chat_sessions (name) VALUES (?)", (name,)
+            )
+            await db.commit()
+            return cursor.lastrowid
+
+    async def get_chat_session(self, session_id: int) -> Optional[Dict[str, Any]]:
+        """Get a chat session by ID"""
+        async with aiosqlite.connect(self.db_path) as db:
+            db.row_factory = aiosqlite.Row
+            cursor = await db.execute(
+                "SELECT * FROM chat_sessions WHERE id = ?", (session_id,)
+            )
+            row = await cursor.fetchone()
+            return dict(row) if row else None
+
+    async def get_chat_sessions(self, limit: int = 50) -> List[Dict[str, Any]]:
+        """Get recent chat sessions"""
+        async with aiosqlite.connect(self.db_path) as db:
+            db.row_factory = aiosqlite.Row
+            cursor = await db.execute(
+                "SELECT * FROM chat_sessions ORDER BY updated_at DESC LIMIT ?",
+                (limit,)
+            )
+            rows = await cursor.fetchall()
+            return [dict(row) for row in rows]
+
+    async def update_chat_session_name(self, session_id: int, name: str) -> bool:
+        """Update a chat session name"""
+        async with aiosqlite.connect(self.db_path) as db:
+            cursor = await db.execute(
+                "UPDATE chat_sessions SET name = ?, updated_at = CURRENT_TIMESTAMP WHERE id = ?",
+                (name, session_id)
+            )
+            await db.commit()
+            return cursor.rowcount > 0
+
+    async def touch_chat_session(self, session_id: int):
+        """Update the session's updated_at timestamp"""
+        async with aiosqlite.connect(self.db_path) as db:
+            await db.execute(
+                "UPDATE chat_sessions SET updated_at = CURRENT_TIMESTAMP WHERE id = ?",
+                (session_id,)
+            )
+            await db.commit()
+
+    async def delete_chat_session(self, session_id: int) -> bool:
+        """Delete a chat session and all its messages"""
+        async with aiosqlite.connect(self.db_path) as db:
+            await db.execute(
+                "DELETE FROM chat_messages WHERE session_id = ?", (session_id,)
+            )
+            cursor = await db.execute(
+                "DELETE FROM chat_sessions WHERE id = ?", (session_id,)
+            )
+            await db.commit()
+            return cursor.rowcount > 0
+
+    async def add_chat_message(self, session_id: int, message: Dict[str, Any]) -> int:
+        """Add a message to a chat session"""
+        async with aiosqlite.connect(self.db_path) as db:
+            tool_calls = message.get("tool_calls")
+            if tool_calls and not isinstance(tool_calls, str):
+                tool_calls = json.dumps(tool_calls)
+            cursor = await db.execute("""
+                INSERT INTO chat_messages (session_id, role, content, tool_calls, tool_call_id, name)
+                VALUES (?, ?, ?, ?, ?, ?)
+            """, (
+                session_id,
+                message["role"],
+                message.get("content"),
+                tool_calls,
+                message.get("tool_call_id"),
+                message.get("name"),
+            ))
+            # Touch the session
+            await db.execute(
+                "UPDATE chat_sessions SET updated_at = CURRENT_TIMESTAMP WHERE id = ?",
+                (session_id,)
+            )
+            await db.commit()
+            return cursor.lastrowid
+
+    async def get_chat_messages(self, session_id: int) -> List[Dict[str, Any]]:
+        """Get all messages for a chat session"""
+        async with aiosqlite.connect(self.db_path) as db:
+            db.row_factory = aiosqlite.Row
+            cursor = await db.execute(
+                "SELECT * FROM chat_messages WHERE session_id = ? ORDER BY id",
+                (session_id,)
+            )
+            rows = await cursor.fetchall()
+            messages = []
+            for row in rows:
+                msg = dict(row)
+                # Parse tool_calls JSON back
+                if msg.get("tool_calls") and isinstance(msg["tool_calls"], str):
+                    try:
+                        msg["tool_calls"] = json.loads(msg["tool_calls"])
+                    except json.JSONDecodeError:
+                        pass
+                messages.append(msg)
+            return messages
 
     # Settings operations
     async def get_setting(self, key: str) -> Optional[str]:

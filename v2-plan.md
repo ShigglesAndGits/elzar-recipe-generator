@@ -132,25 +132,28 @@ services behind them.
 
 ### Phase 3: Conversational Interface
 
-**7. Chat Interface** (enhancement #1)
+**7. Chat Interface** (enhancement #1) — COMPLETED (non-streaming)
 - New DB tables: `chat_sessions`, `chat_messages`
 - Full multi-turn chat with persistent message history across sessions
-- Session list sidebar: name, browse, resume past sessions
-- Collapsible parameter controls at top (cuisine, effort, servings, calories, equipment, etc.)
-- SSE streaming for LLM responses (FastAPI StreamingResponse, frontend fetch-with-reader)
-- Spice Weasel personality toggle
+- Session list sidebar: name, browse, resume, rename, delete past sessions
+- Collapsible parameter controls at top (cuisine, effort, servings, calories, budget,
+  equipment, profiles, Spice Weasel, inventory toggles)
+- Full response mode (SSE streaming deferred to future enhancement)
+- Spice Weasel personality toggle in compact header
 - System prompt includes: user preferences, Grocy inventory summary (if configured),
-  freezer summary (if configured), ideas list, session context
-- LLM tool calls:
+  session parameters, dietary profiles, behavioral rules
+- 13 LLM tool calls implemented:
   **Read/Query:** `get_recipe`, `search_recipes`, `get_ideas_list`, `query_inventory`,
-  `query_freezer`, `get_user_preferences`, `get_prep_cook_session`, `get_debriefs`
+  `query_freezer`, `get_user_preferences`
   **Create:** `create_recipe`, `create_prep_cook_session`, `generate_shopping_list`,
-  `add_to_ideas_list`, `log_debrief`
-  **Edit:** `edit_recipe`, `copy_and_edit_recipe`, `update_ideas_list`,
-  `update_user_preferences`
+  `add_to_ideas_list`
+  **Edit:** `edit_recipe`, `update_idea`, `update_user_preferences`
+- Tool call loop: max 5 iterations, server-side execution
+- Grocy-dependent tools auto-hidden when Grocy not configured
 - Preference prompting: LLM must ASK before calling `update_user_preferences`
-- Settings disclaimer: model must support tool/function calls for Chat to work
-- This becomes the app's landing page
+- Chat is now the app's landing page at `/`, Generator moved to `/generator` as "Quick Recipe"
+- Navigation updated: Chat, Quick Recipe, Inventory, History, Profiles, Settings
+- Meal Planner removed from nav (still accessible at `/meal-planner`)
 
 **8. Iterative Recipe Editing** (enhancement #4)
 - `edit_recipe(id, instructions)` tool call — surgical changes preserving the rest

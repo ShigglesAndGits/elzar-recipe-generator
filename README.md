@@ -89,6 +89,13 @@ Three powerful buttons on every generated recipe:
   - Add missing items to shopping list
   - Save recipes to Grocy
 
+### 💡 Ideas Board
+- **Brainstorm Between Sessions**: Jot down meal ideas anytime — a dish you saw online, a craving, something to try
+- **Status Workflow**: Track ideas through stages: Idea → Planned → Tested → Favorite
+- **Search & Filter**: Filter by status or search across names, notes, and tags
+- **Tags & Calorie Estimates**: Organize with comma-separated tags and rough calorie targets
+- **Promote to Recipe**: Hit "Cook it" to send an idea straight to the Generator with context pre-filled
+
 ### 📜 Recipe History & Management
 - Browse previously generated recipes with filters (cuisine, time, effort, search)
 - **Recipe Locking**: Lock recipes to prevent accidental deletion or regeneration (🔒). Family recipes, finalized favorites, etc.
@@ -141,6 +148,8 @@ elzar-recipe-generator/
 │   │   │   ├── inventory.py           # Inventory management (v1.1)
 │   │   │   ├── history.py             # Recipe history
 │   │   │   ├── profiles.py            # Dietary profiles
+│   │   │   ├── ideas.py               # Ideas brainstorm board
+│   │   │   ├── preferences.py         # Household preferences
 │   │   │   └── settings.py            # Settings & testing
 │   │   ├── services/
 │   │   │   ├── grocy_client.py        # Grocy API client
@@ -157,6 +166,7 @@ elzar-recipe-generator/
 │   │   │   ├── Generator.jsx          # Main recipe generation page
 │   │   │   ├── MealPlanner.jsx        # Multi-day meal planning (v1.2)
 │   │   │   ├── InventoryManager.jsx   # Bulk inventory management
+│   │   │   ├── Ideas.jsx              # Ideas brainstorm board
 │   │   │   ├── History.jsx            # Recipe history browser
 │   │   │   ├── Profiles.jsx           # Dietary profile management
 │   │   │   └── Settings.jsx           # Settings & configuration
@@ -409,14 +419,17 @@ tail -f /root/elzar-recipe-generator/frontend.log
 - [x] Custom chef personas (v1.2)
 - [x] Configurable max token limits (v1.2)
 - [x] Time-based cooking preferences (v1.2)
+- [x] Household preferences (v2.0)
+- [x] Recipe locking & saving (v2.0)
+- [x] Ideas brainstorm board (v2.0)
 
 ### Planned 🚧
+- [ ] Chat interface (AI-powered landing page)
+- [ ] Iterative recipe editing via chat
+- [ ] Freezer inventory integration
 - [ ] Mobile-optimized UI improvements
 - [ ] Recipe notifications via Apprise
-- [ ] Multi-language support
-- [ ] Recipe rating system
-- [ ] Nutrition tracking
-- [ ] Meal plan export/sharing
+- [ ] Nutritional dashboard
 
 ## 🤝 Contributing
 

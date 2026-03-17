@@ -1,4 +1,5 @@
 import React, { useState, useEffect } from 'react';
+import { useLocation } from 'react-router-dom';
 import ReactMarkdown from 'react-markdown';
 import GrocyActionModal from '../components/GrocyActionModal';
 import RecipeIngredientReview from '../components/RecipeIngredientReview';
@@ -88,6 +89,7 @@ const loadFromCookie = (key, defaultValue) => {
 function Generator() {
   // Service status
   const { grocyConfigured } = useServiceStatus();
+  const location = useLocation();
 
   // Form state with cookie persistence
   const [cuisine, setCuisine] = useState(() => loadFromCookie('cuisine', 'No Preference'));
@@ -132,6 +134,20 @@ function Generator() {
   useEffect(() => {
     loadProfiles();
   }, []);
+
+  // Pre-fill from promoted idea (navigated from Ideas page)
+  useEffect(() => {
+    const promoted = location.state?.promotedIdea;
+    if (promoted) {
+      const parts = [`Make a recipe for: ${promoted.name}`];
+      if (promoted.notes) parts.push(promoted.notes);
+      if (promoted.calorie_estimate) parts.push(`Target calories: ${promoted.calorie_estimate}`);
+      if (promoted.tags?.length) parts.push(`Tags: ${promoted.tags.join(', ')}`);
+      setUserPrompt(parts.join('\n'));
+      // Clear the state so refreshing doesn't re-apply
+      window.history.replaceState({}, document.title);
+    }
+  }, [location.state]);
 
   // Save settings to cookies when they change
   useEffect(() => { saveToCookie('cuisine', cuisine); }, [cuisine]);

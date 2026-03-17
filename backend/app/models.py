@@ -103,6 +103,37 @@ class DietaryProfileResponse(BaseModel):
     updated_at: datetime
 
 
+# Ideas Models
+class IdeaCreate(BaseModel):
+    """Request model for creating an idea"""
+    name: str = Field(..., min_length=1, max_length=200)
+    notes: str = ""
+    tags: List[str] = Field(default_factory=list)
+    calorie_estimate: Optional[str] = None  # e.g. "300-400" or "~500"
+    status: str = "idea"  # idea, planned, tested, favorite
+
+
+class IdeaUpdate(BaseModel):
+    """Request model for updating an idea"""
+    name: Optional[str] = Field(None, min_length=1, max_length=200)
+    notes: Optional[str] = None
+    tags: Optional[List[str]] = None
+    calorie_estimate: Optional[str] = None
+    status: Optional[str] = None
+
+
+class IdeaResponse(BaseModel):
+    """Response model for an idea"""
+    id: int
+    name: str
+    notes: str
+    tags: List[str] = Field(default_factory=list)
+    calorie_estimate: Optional[str] = None
+    status: str
+    created_at: datetime
+    updated_at: datetime
+
+
 # User Preferences Models
 class UserPreferencesUpdate(BaseModel):
     """Model for updating user preferences"""

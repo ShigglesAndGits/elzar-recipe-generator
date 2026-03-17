@@ -128,6 +128,27 @@ export const deleteProfile = async (profileId) => {
   return response.data;
 };
 
+// Ideas APIs
+export const getIdeas = async (params = {}) => {
+  const response = await api.get('/api/ideas/', { params });
+  return response.data;
+};
+
+export const createIdea = async (ideaData) => {
+  const response = await api.post('/api/ideas/', ideaData);
+  return response.data;
+};
+
+export const updateIdea = async (ideaId, ideaData) => {
+  const response = await api.put(`/api/ideas/${ideaId}`, ideaData);
+  return response.data;
+};
+
+export const deleteIdea = async (ideaId) => {
+  const response = await api.delete(`/api/ideas/${ideaId}`);
+  return response.data;
+};
+
 // User Preferences APIs
 export const getUserPreferences = async () => {
   const response = await api.get('/api/preferences/');

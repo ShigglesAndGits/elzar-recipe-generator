@@ -6,6 +6,7 @@ import History from './pages/History';
 import Profiles from './pages/Profiles';
 import Settings from './pages/Settings';
 import InventoryManager from './pages/InventoryManager';
+import Ideas from './pages/Ideas';
 import { ServiceStatusProvider, useServiceStatus } from './contexts/ServiceStatusContext';
 import './index.css';
 
@@ -40,6 +41,7 @@ function Navigation() {
     { path: '/', label: 'Generator', icon: '🍳' },
     { path: '/meal-planner', label: 'Meal Planner', icon: '📅' },
     { path: '/inventory', label: 'Inventory', icon: '📦', requiresGrocy: true },
+    { path: '/ideas', label: 'Ideas', icon: '💡' },
     { path: '/history', label: 'History', icon: '📜' },
     { path: '/profiles', label: 'Profiles', icon: '👥' },
     { path: '/settings', label: 'Settings', icon: '⚙️' },
@@ -156,6 +158,7 @@ function AppContent() {
           <Route path="/" element={<Generator />} />
           <Route path="/meal-planner" element={<MealPlanner />} />
           <Route path="/inventory" element={<InventoryManager />} />
+          <Route path="/ideas" element={<Ideas />} />
           <Route path="/history" element={<History />} />
           <Route path="/profiles" element={<Profiles />} />
           <Route path="/settings" element={<Settings />} />

@@ -110,6 +110,28 @@ class Database:
                 INSERT OR IGNORE INTO user_preferences (id, content) VALUES (1, '')
             """)
 
+            # Ideas table
+            await db.execute("""
+                CREATE TABLE IF NOT EXISTS ideas (
+                    id INTEGER PRIMARY KEY AUTOINCREMENT,
+                    name TEXT NOT NULL,
+                    notes TEXT DEFAULT '',
+                    tags TEXT DEFAULT '[]',
+                    calorie_estimate TEXT,
+                    status TEXT DEFAULT 'idea',
+                    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                    updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+                )
+            """)
+            await db.execute("""
+                CREATE INDEX IF NOT EXISTS idx_ideas_status
+                ON ideas(status)
+            """)
+            await db.execute("""
+                CREATE INDEX IF NOT EXISTS idx_ideas_created_at
+                ON ideas(created_at DESC)
+            """)
+
             # Meal plans table
             await db.execute("""
                 CREATE TABLE IF NOT EXISTS meal_plans (
@@ -426,6 +448,98 @@ class Database:
             )
             row = await cursor.fetchone()
             return dict(row)
+
+    # Ideas operations
+    async def create_idea(self, idea_data: Dict[str, Any]) -> int:
+        """Create a new idea"""
+        async with aiosqlite.connect(self.db_path) as db:
+            cursor = await db.execute("""
+                INSERT INTO ideas (name, notes, tags, calorie_estimate, status)
+                VALUES (?, ?, ?, ?, ?)
+            """, (
+                idea_data["name"],
+                idea_data.get("notes", ""),
+                json.dumps(idea_data.get("tags", [])),
+                idea_data.get("calorie_estimate"),
+                idea_data.get("status", "idea"),
+            ))
+            await db.commit()
+            return cursor.lastrowid
+
+    async def get_idea(self, idea_id: int) -> Optional[Dict[str, Any]]:
+        """Get an idea by ID"""
+        async with aiosqlite.connect(self.db_path) as db:
+            db.row_factory = aiosqlite.Row
+            cursor = await db.execute(
+                "SELECT * FROM ideas WHERE id = ?", (idea_id,)
+            )
+            row = await cursor.fetchone()
+            return dict(row) if row else None
+
+    async def get_ideas(
+        self,
+        status: Optional[str] = None,
+        search: Optional[str] = None,
+        tag: Optional[str] = None,
+    ) -> List[Dict[str, Any]]:
+        """Get ideas with optional filtering"""
+        query = "SELECT * FROM ideas WHERE 1=1"
+        params = []
+
+        if status:
+            query += " AND status = ?"
+            params.append(status)
+        if search:
+            query += " AND (name LIKE ? OR notes LIKE ?)"
+            params.extend([f"%{search}%", f"%{search}%"])
+        if tag:
+            query += " AND tags LIKE ?"
+            params.append(f'%"{tag}"%')
+
+        query += " ORDER BY created_at DESC"
+
+        async with aiosqlite.connect(self.db_path) as db:
+            db.row_factory = aiosqlite.Row
+            cursor = await db.execute(query, params)
+            rows = await cursor.fetchall()
+            return [dict(row) for row in rows]
+
+    async def update_idea(self, idea_id: int, idea_data: Dict[str, Any]) -> bool:
+        """Update an idea"""
+        updates = []
+        params = []
+
+        for field in ["name", "notes", "calorie_estimate", "status"]:
+            if field in idea_data:
+                updates.append(f"{field} = ?")
+                params.append(idea_data[field])
+
+        if "tags" in idea_data:
+            updates.append("tags = ?")
+            params.append(json.dumps(idea_data["tags"]))
+
+        if not updates:
+            return False
+
+        updates.append("updated_at = CURRENT_TIMESTAMP")
+        params.append(idea_id)
+
+        async with aiosqlite.connect(self.db_path) as db:
+            cursor = await db.execute(
+                f"UPDATE ideas SET {', '.join(updates)} WHERE id = ?",
+                params
+            )
+            await db.commit()
+            return cursor.rowcount > 0
+
+    async def delete_idea(self, idea_id: int) -> bool:
+        """Delete an idea"""
+        async with aiosqlite.connect(self.db_path) as db:
+            cursor = await db.execute(
+                "DELETE FROM ideas WHERE id = ?", (idea_id,)
+            )
+            await db.commit()
+            return cursor.rowcount > 0
 
     # Settings operations
     async def get_setting(self, key: str) -> Optional[str]:

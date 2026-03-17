@@ -155,12 +155,13 @@ services behind them.
 - Navigation updated: Chat, Quick Recipe, Inventory, History, Profiles, Settings
 - Meal Planner removed from nav (still accessible at `/meal-planner`)
 
-**8. Iterative Recipe Editing** (enhancement #4)
-- `edit_recipe(id, instructions)` tool call — surgical changes preserving the rest
-- Bulk edits across multiple recipes in one request
-- Edit history: `last_edited` timestamp, optional diff view
-- Respects lock status — locked recipes use `copy_and_edit_recipe` to fork a variant
-- The existing Regenerate button (🔄) remains for full regeneration
+**8. Iterative Recipe Editing** (enhancement #4) — COMPLETED
+- `edit_recipe(id, instructions)` tool call — surgical LLM-powered changes preserving the rest
+- `copy_and_edit_recipe(id, instructions)` — explicitly fork a recipe as a variant
+- `last_edited` timestamp column on recipes, updated on every edit
+- Lock-aware: locked recipes auto-fork via `copy_and_edit_recipe` with `parent_recipe_id` set
+- Variant linking preserved: new variants reference their parent recipe
+- The existing Regenerate button remains for full regeneration on Quick Recipe page
 
 ### Phase 4: Polish & Enhancement
 

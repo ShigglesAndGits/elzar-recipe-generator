@@ -55,6 +55,12 @@ class Database:
                 except Exception:
                     pass  # Column already exists
 
+            # Iterative recipe editing migration
+            try:
+                await db.execute("ALTER TABLE recipes ADD COLUMN last_edited TIMESTAMP")
+            except Exception:
+                pass  # Column already exists
+
             # Settings table
             await db.execute("""
                 CREATE TABLE IF NOT EXISTS settings (

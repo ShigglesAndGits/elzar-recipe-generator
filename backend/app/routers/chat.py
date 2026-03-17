@@ -235,12 +235,27 @@ TOOL_DEFINITIONS = [
         "type": "function",
         "function": {
             "name": "edit_recipe",
-            "description": "Make targeted edits to an existing recipe while preserving the rest. If the recipe is locked, this will create a variant instead.",
+            "description": "Make targeted edits to an existing recipe while preserving the rest. If the recipe is locked, this will automatically create a variant instead of editing in place.",
             "parameters": {
                 "type": "object",
                 "properties": {
                     "recipe_id": {"type": "integer", "description": "The recipe ID to edit"},
                     "instructions": {"type": "string", "description": "What to change, e.g. 'swap chicken for tofu, add mushrooms'"},
+                },
+                "required": ["recipe_id", "instructions"]
+            }
+        }
+    },
+    {
+        "type": "function",
+        "function": {
+            "name": "copy_and_edit_recipe",
+            "description": "Create a new recipe as a variant of an existing one, applying edits. Use this when the user wants to keep the original and create a modified version (e.g. 'make a vegetarian version of recipe 5').",
+            "parameters": {
+                "type": "object",
+                "properties": {
+                    "recipe_id": {"type": "integer", "description": "The original recipe ID to fork from"},
+                    "instructions": {"type": "string", "description": "What to change in the variant"},
                 },
                 "required": ["recipe_id", "instructions"]
             }
@@ -316,6 +331,8 @@ async def execute_tool(
             return await _tool_generate_shopping_list(arguments, config)
         elif tool_name == "edit_recipe":
             return await _tool_edit_recipe(arguments, config)
+        elif tool_name == "copy_and_edit_recipe":
+            return await _tool_copy_and_edit_recipe(arguments, config)
         elif tool_name == "get_user_preferences":
             return await _tool_get_user_preferences()
         elif tool_name == "update_user_preferences":
@@ -713,7 +730,7 @@ Return the COMPLETE updated recipe text (not just the changes). Keep the same fo
         "model": llm.model,
         "messages": [{"role": "user", "content": prompt}],
         "temperature": 0.3,
-        "max_tokens": 2000,
+        "max_tokens": min(4000, int(config.get("llm_max_tokens", 16000))),
     }
 
     async with httpx.AsyncClient(timeout=120.0) as client:
@@ -728,36 +745,85 @@ Return the COMPLETE updated recipe text (not just the changes). Keep the same fo
 
     if is_locked:
         # Create a variant instead of editing
-        new_id = await db.create_recipe({
-            "recipe_text": edited_text,
-            "cuisine": recipe.get("cuisine"),
-            "time_minutes": recipe.get("time_minutes"),
-            "effort_level": recipe.get("effort_level"),
-            "calories_per_serving": recipe.get("calories_per_serving"),
-            "estimated_cost": recipe.get("estimated_cost"),
-            "used_external_ingredients": recipe.get("used_external_ingredients"),
-            "prioritize_expiring": recipe.get("prioritize_expiring"),
-            "active_profiles": json.loads(recipe.get("active_profiles", "[]")),
-            "user_prompt": args["instructions"],
-            "llm_model": config["llm_model"],
-        })
-        # Set parent_recipe_id
-        async with __import__("aiosqlite").connect(db.db_path) as conn:
-            await conn.execute(
-                "UPDATE recipes SET parent_recipe_id = ? WHERE id = ?",
-                (args["recipe_id"], new_id)
-            )
-            await conn.commit()
+        new_id = await _create_recipe_variant(recipe, edited_text, args, config)
         return f"Recipe {args['recipe_id']} is locked — created variant (ID: {new_id}) instead.\n\n{edited_text}"
     else:
         # Update in place
-        async with __import__("aiosqlite").connect(db.db_path) as conn:
+        import aiosqlite
+        async with aiosqlite.connect(db.db_path) as conn:
             await conn.execute(
-                "UPDATE recipes SET recipe_text = ? WHERE id = ?",
+                "UPDATE recipes SET recipe_text = ?, last_edited = CURRENT_TIMESTAMP WHERE id = ?",
                 (edited_text, args["recipe_id"])
             )
             await conn.commit()
         return f"Recipe {args['recipe_id']} updated.\n\n{edited_text}"
+
+
+async def _create_recipe_variant(original: dict, new_text: str, args: dict, config: dict) -> int:
+    """Create a new recipe as a variant of an existing one."""
+    new_id = await db.create_recipe({
+        "recipe_text": new_text,
+        "cuisine": original.get("cuisine"),
+        "time_minutes": original.get("time_minutes"),
+        "effort_level": original.get("effort_level"),
+        "calories_per_serving": original.get("calories_per_serving"),
+        "estimated_cost": original.get("estimated_cost"),
+        "used_external_ingredients": original.get("used_external_ingredients"),
+        "prioritize_expiring": original.get("prioritize_expiring"),
+        "active_profiles": json.loads(original.get("active_profiles", "[]")),
+        "user_prompt": args.get("instructions", ""),
+        "llm_model": config["llm_model"],
+    })
+    import aiosqlite
+    async with aiosqlite.connect(db.db_path) as conn:
+        await conn.execute(
+            "UPDATE recipes SET parent_recipe_id = ? WHERE id = ?",
+            (original["id"], new_id)
+        )
+        await conn.commit()
+    return new_id
+
+
+async def _tool_copy_and_edit_recipe(args: dict, config: dict) -> str:
+    """Fork a recipe as a new variant and apply edits."""
+    recipe = await db.get_recipe(args["recipe_id"])
+    if not recipe:
+        return f"Recipe {args['recipe_id']} not found."
+
+    llm = LLMClient(
+        config["llm_api_url"], config["llm_api_key"], config["llm_model"],
+        max_tokens=int(config.get("llm_max_tokens", 16000))
+    )
+
+    prompt = f"""Apply the following edits to this recipe. Preserve everything that isn't being changed.
+
+ORIGINAL RECIPE:
+{recipe['recipe_text']}
+
+EDITS REQUESTED:
+{args['instructions']}
+
+Return the COMPLETE updated recipe text (not just the changes). Keep the same format."""
+
+    payload = {
+        "model": llm.model,
+        "messages": [{"role": "user", "content": prompt}],
+        "temperature": 0.3,
+        "max_tokens": min(4000, int(config.get("llm_max_tokens", 16000))),
+    }
+
+    async with httpx.AsyncClient(timeout=120.0) as client:
+        response = await client.post(
+            f"{llm.api_url}/chat/completions",
+            headers=llm.headers,
+            json=payload,
+        )
+        response.raise_for_status()
+        data = response.json()
+        edited_text = data["choices"][0]["message"]["content"]
+
+    new_id = await _create_recipe_variant(recipe, edited_text, args, config)
+    return f"Created variant of recipe {args['recipe_id']} (new ID: {new_id}).\n\n{edited_text}"
 
 
 async def _tool_get_user_preferences() -> str:

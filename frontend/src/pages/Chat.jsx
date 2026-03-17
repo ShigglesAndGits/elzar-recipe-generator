@@ -734,6 +734,7 @@ function ToolResultBadge({ result }) {
     create_prep_cook_session: '🥘',
     generate_shopping_list: '🛒',
     edit_recipe: '✏️',
+    copy_and_edit_recipe: '📋',
     get_user_preferences: '👤',
     update_user_preferences: '👤',
   };

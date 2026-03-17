@@ -185,16 +185,16 @@ services behind them.
   learns from past sessions when planning new ones
 - Feedback loop: plan → cook → eat → debrief → better plan
 
-**11. Bulk Ingredient Prep Tracking** (enhancement #6)
-- Track pre-made base ingredients (garlic blend, caramelized onions, etc.)
-- Shopping list generation accounts for bulk prep inventory
-- Recipes can reference bulk ingredients
-- Low-stock reminders
+**11. Bulk Ingredient Prep Tracking** (enhancement #6) — REPLACED BY PROMPT GUIDANCE
+- Decision: Instead of building dedicated tracking infrastructure, added behavioral rules
+  to the chat system prompt instructing the LLM to proactively identify and suggest bulk
+  prep opportunities (caramelized onions, minced garlic, herb butters, cooked grains, etc.)
+- The LLM handles this organically through conversation rather than needing a separate system
 
-**12. Opportunistic Batching Suggestions** (enhancement #9)
-- Chat behavior: detect equipment use or upcoming cooks, suggest piggybacking
-- Factor in ideas list, freezer gaps, available equipment
-- Combined prep plans layering opportunistic work into existing cooks
+**12. Opportunistic Batching Suggestions** (enhancement #9) — REPLACED BY PROMPT GUIDANCE
+- Decision: Folded into the same system prompt rule as #11. The LLM naturally detects
+  when a recipe involves a bulk-prep opportunity and suggests making extra to freeze.
+  No dedicated feature needed — this is exactly what conversational planning is for.
 
 **13. Nutritional Awareness Dashboard** (enhancement #11)
 - Per-portion calorie/macro estimates

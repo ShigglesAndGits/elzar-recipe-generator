@@ -1018,6 +1018,11 @@ async def build_system_prompt(
         "- Keep responses concise. Don't repeat the full recipe back in chat — just confirm it was created "
         "  and highlight key details.",
         "- You can call multiple tools in one turn if needed.",
+        "- When suggesting recipes or planning meals, proactively point out ingredients that "
+        "  could be prepped in bulk and frozen for future use — things like caramelized onions, "
+        "  minced garlic, herb butters, cooked grains, blanched vegetables, homemade stock, "
+        "  spice blends, etc. If the user is already making something that involves a bulk-prep "
+        "  opportunity (e.g. caramelizing onions for a recipe), suggest making extra to freeze.",
     ])
 
     return "\n".join(parts)

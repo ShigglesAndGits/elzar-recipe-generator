@@ -609,7 +609,7 @@ Provide ONLY the reformatted recipe with NO additional text."""
             f"- Meals to plan: {', '.join(meals_list)}",
             f"- Budget: {budget_level.upper()} - {budget_descriptions.get(budget_level, 'moderate budget')}",
             ""
-        ]
+        ])
 
         if daily_calorie_target:
             prompt_parts.append(f"CALORIE TARGET: {daily_calorie_target} calories per day per person")
@@ -1052,7 +1052,7 @@ Provide ONLY the reformatted recipe with NO additional text."""
             f"- Budget: {budget_level.upper()} - {budget_descriptions.get(budget_level, 'moderate budget')}",
             f"- Effort level: {effort_descriptions.get(effort_level, 'moderate')}",
             ""
-        ]
+        ])
 
         # Add the old recipe that's being replaced
         if old_recipe_text:

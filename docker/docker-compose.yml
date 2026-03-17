@@ -19,6 +19,11 @@ services:
       - LLM_API_KEY=${LLM_API_KEY}
       - LLM_MODEL=${LLM_MODEL}
 
+      # Vision Model Configuration (Optional - falls back to LLM settings)
+      - VISION_API_URL=${VISION_API_URL:-}
+      - VISION_API_KEY=${VISION_API_KEY:-}
+      - VISION_MODEL=${VISION_MODEL:-}
+
       # Optional Settings
       - MAX_RECIPE_HISTORY=${MAX_RECIPE_HISTORY:-50}
       - APPRISE_URL=${APPRISE_URL:-}

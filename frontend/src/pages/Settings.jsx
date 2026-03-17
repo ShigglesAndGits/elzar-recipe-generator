@@ -94,9 +94,14 @@ function Settings() {
       llm_api_url: config.llm_api_url,
       llm_api_key: '',
       llm_model: config.llm_model,
+      llm_max_tokens: config.llm_max_tokens || 16000,
+      vision_api_url: config.vision_api_url || '',
+      vision_api_key: '',
+      vision_model: config.vision_model || '',
       max_recipe_history: config.max_recipe_history,
       apprise_url: config.apprise_url || '',
       unit_preference: config.unit_preference || 'metric',
+      custom_persona: config.custom_persona || 'You are a professional chef and nutritionist.',
     });
     setEditMode(true);
   };
@@ -249,8 +254,9 @@ function Settings() {
         
         {kioskMode && (
           <div className="mt-4 bg-yellow-900 border border-yellow-700 rounded-lg p-4 text-yellow-200">
-            <p className="text-sm">
-              🌶️ Kiosk mode enabled! The interface is now optimized for touchscreens with larger buttons and simplified navigation.
+            <p className="text-sm flex items-center gap-2">
+              <img src="/elzar.png" alt="Elzar" className="h-5 w-5 object-contain" />
+              Kiosk mode enabled! The interface is now optimized for touchscreens with larger buttons and simplified navigation.
             </p>
           </div>
         )}
@@ -291,8 +297,25 @@ function Settings() {
                 <p className="text-sm text-gray-300 mt-1">
                   <span className="text-gray-400">Model:</span> <span className="font-mono">{config.llm_model}</span>
                 </p>
+                <p className="text-sm text-gray-300 mt-1">
+                  <span className="text-gray-400">Max Tokens:</span> <span className="font-mono">{config.llm_max_tokens || 16000}</span>
+                </p>
                 <p className="text-xs text-gray-500 mt-1">
                   API Key: {config.llm_api_key || 'Not set'}
+                </p>
+              </div>
+
+              <div className="bg-gray-700 rounded-lg p-4">
+                <h3 className="font-semibold mb-2">Vision Model Configuration</h3>
+                <p className="text-xs text-gray-400 mb-2">For pantry scanning feature - falls back to LLM settings if not configured</p>
+                <p className="text-sm text-gray-300">
+                  <span className="text-gray-400">API URL:</span> <span className="font-mono">{config.vision_api_url || '(using LLM API URL)'}</span>
+                </p>
+                <p className="text-sm text-gray-300 mt-1">
+                  <span className="text-gray-400">Model:</span> <span className="font-mono">{config.vision_model || '(using LLM model)'}</span>
+                </p>
+                <p className="text-xs text-gray-500 mt-1">
+                  API Key: {config.vision_api_key || '(using LLM API key)'}
                 </p>
               </div>
 
@@ -318,6 +341,16 @@ function Settings() {
                 <h3 className="font-semibold mb-2">Unit Preference</h3>
                 <p className="text-sm text-gray-300">
                   {config.unit_preference === 'metric' ? '📏 Metric (g, kg, ml, l)' : '📐 Imperial (oz, lb, fl oz, gal)'}
+                </p>
+              </div>
+
+              <div className="bg-gray-700 rounded-lg p-4">
+                <h3 className="font-semibold mb-2">Chef Persona</h3>
+                <p className="text-sm text-gray-300 italic">
+                  "{config.custom_persona || 'You are a professional chef and nutritionist.'}"
+                </p>
+                <p className="text-xs text-gray-500 mt-2">
+                  This is the base personality for recipe generation. The Elzar/Spice Weasel toggle adds flavor on top.
                 </p>
               </div>
             </div>
@@ -379,6 +412,71 @@ function Settings() {
               </div>
 
               <div>
+                <label className="block text-sm font-medium mb-2">Max Output Tokens</label>
+                <input
+                  type="number"
+                  value={editForm.llm_max_tokens || 16000}
+                  onChange={(e) => setEditForm({...editForm, llm_max_tokens: parseInt(e.target.value) || 16000})}
+                  className="w-full bg-gray-700 border border-gray-600 rounded-lg px-4 py-2 focus:ring-2 focus:ring-elzar-red"
+                  min="1000"
+                  max="128000"
+                  step="1000"
+                />
+                <p className="text-xs text-gray-400 mt-1">
+                  Maximum tokens for LLM responses. Increase for longer meal plans (default: 16000).
+                </p>
+              </div>
+
+              {/* Vision Model Configuration */}
+              <div className="border-t border-gray-600 pt-4 mt-4">
+                <h3 className="text-lg font-semibold mb-3 flex items-center">
+                  <span className="mr-2">📷</span>
+                  Vision Model (Optional)
+                </h3>
+                <p className="text-xs text-gray-400 mb-4">
+                  Configure a separate model for pantry scanning. Leave blank to use the LLM settings above.
+                </p>
+              </div>
+
+              <div>
+                <label className="block text-sm font-medium mb-2">Vision API URL</label>
+                <input
+                  type="text"
+                  value={editForm.vision_api_url || ''}
+                  onChange={(e) => setEditForm({...editForm, vision_api_url: e.target.value})}
+                  className="w-full bg-gray-700 border border-gray-600 rounded-lg px-4 py-2 focus:ring-2 focus:ring-elzar-red"
+                  placeholder="Leave blank to use LLM API URL"
+                />
+              </div>
+
+              <div>
+                <label className="block text-sm font-medium mb-2">Vision API Key</label>
+                <input
+                  type="password"
+                  value={editForm.vision_api_key || ''}
+                  onChange={(e) => setEditForm({...editForm, vision_api_key: e.target.value})}
+                  className="w-full bg-gray-700 border border-gray-600 rounded-lg px-4 py-2 focus:ring-2 focus:ring-elzar-red"
+                  placeholder="Leave blank to use LLM API key"
+                />
+              </div>
+
+              <div>
+                <label className="block text-sm font-medium mb-2">Vision Model</label>
+                <input
+                  type="text"
+                  value={editForm.vision_model || ''}
+                  onChange={(e) => setEditForm({...editForm, vision_model: e.target.value})}
+                  className="w-full bg-gray-700 border border-gray-600 rounded-lg px-4 py-2 focus:ring-2 focus:ring-elzar-red"
+                  placeholder="e.g., gpt-4o, google/gemini-2.0-flash-exp:free"
+                />
+                <p className="text-xs text-gray-400 mt-1">
+                  Must support vision/image input. GPT-4o, Gemini, and Claude all support vision.
+                </p>
+              </div>
+
+              <div className="border-t border-gray-600 pt-4 mt-4"></div>
+
+              <div>
                 <label className="block text-sm font-medium mb-2">Max Recipe History</label>
                 <input
                   type="number"
@@ -431,6 +529,30 @@ function Settings() {
                 </div>
                 <p className="text-xs text-gray-400 mt-1">
                   Used for inventory parsing and recipe ingredient matching
+                </p>
+              </div>
+
+              <div className="border-t border-gray-600 pt-4 mt-4">
+                <h3 className="text-lg font-semibold mb-3 flex items-center">
+                  <img src="/elzar.png" alt="Elzar" className="h-6 w-6 object-contain mr-2" />
+                  Chef Persona
+                </h3>
+                <p className="text-xs text-gray-400 mb-4">
+                  Customize the AI's base personality for recipe generation. The Elzar/Spice Weasel toggle in the recipe generator adds Futurama flair on top of this.
+                </p>
+              </div>
+
+              <div>
+                <label className="block text-sm font-medium mb-2">Custom Persona</label>
+                <textarea
+                  value={editForm.custom_persona || ''}
+                  onChange={(e) => setEditForm({...editForm, custom_persona: e.target.value})}
+                  rows="3"
+                  className="w-full bg-gray-700 border border-gray-600 rounded-lg px-4 py-2 focus:ring-2 focus:ring-elzar-red"
+                  placeholder="You are a professional chef and nutritionist."
+                />
+                <p className="text-xs text-gray-400 mt-1">
+                  Examples: "You are a budget-conscious home cook.", "You are a professional nutritionist focused on heart-healthy meals.", "You are a quick-meal specialist for busy families."
                 </p>
               </div>
 
@@ -649,8 +771,9 @@ function Settings() {
         <h2 className="text-2xl font-bold mb-4">About Elzar</h2>
         
         <div className="text-gray-300 space-y-3">
-          <p>
-            <span className="text-3xl">🌶️</span> <strong>Elzar</strong> - The Grocy Recipe Generator
+          <p className="flex items-center gap-2">
+            <img src="/elzar.png" alt="Elzar" className="h-10 w-10 object-contain" />
+            <strong>Elzar</strong> - The Grocy Recipe Generator
           </p>
           <p>
             Version 1.0.0

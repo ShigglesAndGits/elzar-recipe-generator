@@ -5,21 +5,23 @@ from typing import Optional, Dict, Any
 def extract_metadata_from_recipe(recipe_text: str) -> Dict[str, Any]:
     """
     Extract metadata from the recipe text
-    
+
     Looks for the METADATA section at the end of the recipe
     and extracts structured information
-    
+
     Returns a dict with:
         - cuisine: str or None
         - time_minutes: int or None
         - effort_level: str or None
         - calories_per_serving: int or None
+        - estimated_cost: float or None
     """
     metadata = {
         "cuisine": None,
         "time_minutes": None,
         "effort_level": None,
-        "calories_per_serving": None
+        "calories_per_serving": None,
+        "estimated_cost": None
     }
     
     # Look for metadata section
@@ -69,7 +71,32 @@ def extract_metadata_from_recipe(recipe_text: str) -> Dict[str, Any]:
     )
     if calories_match:
         metadata["calories_per_serving"] = int(calories_match.group(1))
-    
+
+    # Extract estimated cost
+    cost_match = re.search(
+        r'Estimated Cost:\s*\$?([\d.]+)',
+        metadata_text,
+        re.IGNORECASE
+    )
+    if cost_match:
+        try:
+            metadata["estimated_cost"] = float(cost_match.group(1))
+        except ValueError:
+            pass
+
+    # Also try to extract from the first line format: **Est. Cost:** $X.XX
+    if metadata["estimated_cost"] is None:
+        first_line_cost = re.search(
+            r'\*\*Est\. Cost:\*\*\s*\$?([\d.]+)',
+            recipe_text,
+            re.IGNORECASE
+        )
+        if first_line_cost:
+            try:
+                metadata["estimated_cost"] = float(first_line_cost.group(1))
+            except ValueError:
+                pass
+
     return metadata
 
 
@@ -109,7 +136,12 @@ def format_recipe_for_download(
         header_parts.append(
             f"Calories: {recipe_metadata['calories_per_serving']} per serving"
         )
-    
+
+    if recipe_metadata.get("estimated_cost"):
+        header_parts.append(
+            f"Estimated Cost: ${recipe_metadata['estimated_cost']:.2f}"
+        )
+
     if recipe_metadata.get("active_profiles"):
         profiles = recipe_metadata["active_profiles"]
         if profiles:

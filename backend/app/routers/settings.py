@@ -22,6 +22,9 @@ class ConfigResponse(BaseModel):
     llm_api_url: str
     llm_api_key: str    # Masked in response
     llm_model: str
+    vision_api_url: Optional[str] = None
+    vision_api_key: Optional[str] = None  # Masked in response
+    vision_model: Optional[str] = None
     max_recipe_history: int
     apprise_url: Optional[str] = None
     notification_configured: bool
@@ -35,9 +38,33 @@ class CoreConfigUpdate(BaseModel):
     llm_api_url: Optional[str] = None
     llm_api_key: Optional[str] = None
     llm_model: Optional[str] = None
+    vision_api_url: Optional[str] = None
+    vision_api_key: Optional[str] = None
+    vision_model: Optional[str] = None
     max_recipe_history: Optional[int] = None
     apprise_url: Optional[str] = None
     unit_preference: Optional[str] = None  # "metric" or "imperial"
+
+
+@router.get("/status")
+async def get_status():
+    """
+    Get status of configured services.
+    Returns which integrations are available (Grocy, notifications, etc.)
+    """
+    config = await get_effective_config()
+
+    grocy_configured = bool(config.get("grocy_url") and config.get("grocy_api_key"))
+    llm_configured = bool(config.get("llm_api_url") and config.get("llm_api_key"))
+    vision_configured = bool(config.get("vision_api_url") and config.get("vision_api_key") and config.get("vision_model"))
+    notifications_configured = bool(config.get("apprise_url"))
+
+    return {
+        "grocy_configured": grocy_configured,
+        "llm_configured": llm_configured,
+        "vision_configured": vision_configured,
+        "notifications_configured": notifications_configured
+    }
 
 
 @router.get("/config", response_model=ConfigResponse)
@@ -61,13 +88,24 @@ async def get_config():
         masked_llm = "***"
     else:
         masked_llm = ""
-        
+
+    vision_key = config.get("vision_api_key", "")
+    if vision_key and len(vision_key) > 8:
+        masked_vision = f"{vision_key[:4]}...{vision_key[-4:]}"
+    elif vision_key:
+        masked_vision = "***"
+    else:
+        masked_vision = ""
+
     return ConfigResponse(
         grocy_url=config["grocy_url"],
         grocy_api_key=masked_grocy,
         llm_api_url=config["llm_api_url"],
         llm_api_key=masked_llm,
         llm_model=config["llm_model"],
+        vision_api_url=config.get("vision_api_url", ""),
+        vision_api_key=masked_vision,
+        vision_model=config.get("vision_model", ""),
         max_recipe_history=config["max_recipe_history"],
         apprise_url=config["apprise_url"],
         notification_configured=config["apprise_url"] is not None and config["apprise_url"] != "",
@@ -108,7 +146,16 @@ async def update_core_config(update: CoreConfigUpdate):
             
         if update.llm_model is not None:
             await db.set_setting("llm_model", update.llm_model)
-            
+
+        if update.vision_api_url is not None:
+            await db.set_setting("vision_api_url", update.vision_api_url)
+
+        if update.vision_api_key is not None and update.vision_api_key != "***" and update.vision_api_key.strip():
+            await db.set_setting("vision_api_key", update.vision_api_key)
+
+        if update.vision_model is not None:
+            await db.set_setting("vision_model", update.vision_model)
+
         if update.max_recipe_history is not None:
             await db.set_setting("max_recipe_history", str(update.max_recipe_history))
             

@@ -1,4 +1,4 @@
-from fastapi import APIRouter, HTTPException, status
+from fastapi import APIRouter, HTTPException, status, UploadFile, File
 from typing import List
 import json
 
@@ -11,16 +11,30 @@ from ..models import (
 )
 from ..services.grocy_client import GrocyClient
 from ..services.inventory_matcher import InventoryMatcher
+from ..services.vision_client import VisionClient
 from ..utils.config_manager import get_effective_config
 
 router = APIRouter(prefix="/api/inventory", tags=["inventory"])
+
+
+async def require_grocy_configured():
+    """
+    Check if Grocy is configured and raise an error if not.
+    Call this at the start of any endpoint that requires Grocy.
+    """
+    config = await get_effective_config()
+    if not config.get("grocy_url") or not config.get("grocy_api_key"):
+        raise HTTPException(
+            status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
+            detail="Grocy is not configured. Please set up Grocy URL and API key in Settings."
+        )
 
 
 @router.post("/parse", response_model=List[ParsedItem])
 async def parse_inventory_text(request: InventoryParseRequest):
     """
     Parse text input and match items to Grocy products using LLM
-    
+
     This endpoint:
     1. Fetches all Grocy products and locations
     2. Uses LLM to parse the input text
@@ -28,6 +42,7 @@ async def parse_inventory_text(request: InventoryParseRequest):
     4. Suggests storage locations
     5. Returns confidence scores
     """
+    await require_grocy_configured()
     config = await get_effective_config()
     
     # Initialize clients
@@ -84,12 +99,13 @@ async def parse_inventory_text(request: InventoryParseRequest):
 async def purchase_items(request: InventoryActionRequest):
     """
     Purchase/add multiple items to Grocy stock
-    
+
     This endpoint:
     1. Creates new products if needed (when create_if_missing=True)
     2. Adds stock for each item
     3. Returns summary of actions taken
     """
+    await require_grocy_configured()
     config = await get_effective_config()
     grocy_client = GrocyClient(config["grocy_url"], config["grocy_api_key"])
     
@@ -241,12 +257,13 @@ async def purchase_items(request: InventoryActionRequest):
 async def consume_items(request: InventoryActionRequest):
     """
     Consume/remove multiple items from Grocy stock
-    
+
     This endpoint:
     1. Consumes stock for each item
     2. Skips items that don't have a product_id
     3. Returns summary of actions taken
     """
+    await require_grocy_configured()
     config = await get_effective_config()
     grocy_client = GrocyClient(config["grocy_url"], config["grocy_api_key"])
     
@@ -323,11 +340,12 @@ async def consume_items(request: InventoryActionRequest):
 async def add_to_shopping_list(request: InventoryActionRequest):
     """
     Add items to Grocy shopping list
-    
+
     This endpoint:
     1. Creates missing products if requested
     2. Adds items to the shopping list
     """
+    await require_grocy_configured()
     config = await get_effective_config()
     grocy_client = GrocyClient(config["grocy_url"], config["grocy_api_key"])
     
@@ -481,17 +499,18 @@ async def add_to_shopping_list(request: InventoryActionRequest):
 async def create_products(products: List[ProductCreateRequest]):
     """
     Create multiple new products in Grocy
-    
+
     Returns list of created product IDs
     """
+    await require_grocy_configured()
     config = await get_effective_config()
     grocy_client = GrocyClient(config["grocy_url"], config["grocy_api_key"])
-    
+
     results = {
         "success": [],
         "failed": []
     }
-    
+
     try:
         for product in products:
             try:
@@ -501,23 +520,125 @@ async def create_products(products: List[ProductCreateRequest]):
                     qu_id_stock=product.qu_id_stock,
                     description=product.description
                 )
-                
+
                 results["success"].append({
                     "name": product.name,
                     "id": created["created_object_id"]
                 })
-                
+
             except Exception as e:
                 results["failed"].append({
                     "name": product.name,
                     "reason": str(e)
                 })
-        
+
         return results
-        
+
     except Exception as e:
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
             detail=f"Error creating products: {str(e)}"
+        )
+
+
+@router.post("/scan", response_model=List[ParsedItem])
+async def scan_pantry_images(files: List[UploadFile] = File(...)):
+    """
+    Scan pantry/fridge images using vision AI and extract food items.
+
+    This endpoint:
+    1. Accepts one or more images (JPEG, PNG, WebP)
+    2. Uses a vision-capable LLM to identify food items
+    3. Matches items to existing Grocy products
+    4. Returns parsed items ready for the inventory review flow
+
+    The response format matches the /parse endpoint for seamless integration
+    with the existing inventory management UI.
+    """
+    await require_grocy_configured()
+    config = await get_effective_config()
+
+    # Get vision model settings (fall back to LLM settings if not configured)
+    vision_api_url = config.get("vision_api_url") or config["llm_api_url"]
+    vision_api_key = config.get("vision_api_key") or config["llm_api_key"]
+    vision_model = config.get("vision_model") or config["llm_model"]
+
+    if not vision_api_url or not vision_api_key or not vision_model:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Vision model not configured. Please configure vision settings or LLM settings in the Settings page."
+        )
+
+    # Validate files
+    allowed_types = {"image/jpeg", "image/png", "image/webp", "image/jpg"}
+    images = []
+
+    for file in files:
+        if file.content_type not in allowed_types:
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail=f"Invalid file type: {file.content_type}. Allowed types: JPEG, PNG, WebP"
+            )
+
+        # Read image data
+        image_data = await file.read()
+
+        # Check file size (max 20MB per image)
+        if len(image_data) > 20 * 1024 * 1024:
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail=f"File {file.filename} is too large. Maximum size is 20MB."
+            )
+
+        images.append((image_data, file.content_type))
+
+    if not images:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="No images provided"
+        )
+
+    # Initialize clients
+    grocy_client = GrocyClient(config["grocy_url"], config["grocy_api_key"])
+    vision_client = VisionClient(vision_api_url, vision_api_key, vision_model)
+
+    try:
+        # Fetch Grocy data for matching
+        products = await grocy_client.get_products()
+        locations = await grocy_client.get_locations()
+
+        # Get unit preference
+        unit_preference = config.get("unit_preference", "metric")
+
+        # Scan images
+        parsed_items = await vision_client.scan_images(
+            images,
+            products,
+            locations,
+            unit_preference
+        )
+
+        # Convert to ParsedItem models
+        result = []
+        for item in parsed_items:
+            parsed_item = ParsedItem(
+                original_text=item.get("original_text", item.get("item_name", "")),
+                item_name=item.get("item_name", "Unknown"),
+                quantity=float(item.get("quantity") or 1.0),
+                unit=item.get("unit") or "count",
+                grocy_product_id=item.get("matched_product_id"),
+                grocy_product_name=item.get("matched_product_name"),
+                confidence=item.get("confidence", "medium"),
+                location_id=item.get("suggested_location_id"),
+                quantity_unit_id=None  # Will be determined during purchase
+            )
+            result.append(parsed_item)
+
+        return result
+
+    except Exception as e:
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=f"Error scanning images: {str(e)}"
         )
 

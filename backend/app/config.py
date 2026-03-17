@@ -13,6 +13,12 @@ class Settings(BaseSettings):
     llm_api_url: str = "https://openrouter.ai/api/v1"
     llm_api_key: str = ""
     llm_model: str = "google/gemini-2.0-flash-exp:free"
+    llm_max_tokens: int = 16000  # Max output tokens for LLM responses
+
+    # Vision Model Configuration (for pantry scanning)
+    vision_api_url: Optional[str] = None  # Falls back to llm_api_url if not set
+    vision_api_key: Optional[str] = None  # Falls back to llm_api_key if not set
+    vision_model: Optional[str] = None  # Falls back to llm_model if not set
     
     # Application Settings
     max_recipe_history: int = 1000

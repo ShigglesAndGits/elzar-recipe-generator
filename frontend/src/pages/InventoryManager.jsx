@@ -1,14 +1,86 @@
-import React, { useState } from 'react';
-import { parseInventoryText, purchaseItems, consumeItems } from '../api';
+import React, { useState, useRef } from 'react';
+import { parseInventoryText, purchaseItems, consumeItems, scanPantryImages } from '../api';
 
 function InventoryManager() {
   const [inputText, setInputText] = useState('');
   const [actionType, setActionType] = useState('purchase');
+  const [inputMode, setInputMode] = useState('text'); // 'text' or 'scan'
   const [parsedItems, setParsedItems] = useState([]);
   const [parsing, setParsing] = useState(false);
   const [processing, setProcessing] = useState(false);
   const [error, setError] = useState(null);
   const [results, setResults] = useState(null);
+  const [selectedFiles, setSelectedFiles] = useState([]);
+  const [previewUrls, setPreviewUrls] = useState([]);
+  const fileInputRef = useRef(null);
+
+  const handleFileSelect = (e) => {
+    const files = Array.from(e.target.files);
+    if (files.length === 0) return;
+
+    // Validate file types
+    const validFiles = files.filter(file =>
+      ['image/jpeg', 'image/png', 'image/webp', 'image/jpg'].includes(file.type)
+    );
+
+    if (validFiles.length !== files.length) {
+      setError('Some files were skipped. Only JPEG, PNG, and WebP images are allowed.');
+    }
+
+    // Create preview URLs
+    const urls = validFiles.map(file => URL.createObjectURL(file));
+
+    setSelectedFiles(prev => [...prev, ...validFiles]);
+    setPreviewUrls(prev => [...prev, ...urls]);
+  };
+
+  const handleRemoveFile = (index) => {
+    URL.revokeObjectURL(previewUrls[index]);
+    setSelectedFiles(prev => prev.filter((_, i) => i !== index));
+    setPreviewUrls(prev => prev.filter((_, i) => i !== index));
+  };
+
+  const handleClearFiles = () => {
+    previewUrls.forEach(url => URL.revokeObjectURL(url));
+    setSelectedFiles([]);
+    setPreviewUrls([]);
+  };
+
+  const handleScanImages = async () => {
+    if (selectedFiles.length === 0) {
+      setError('Please select at least one image to scan');
+      return;
+    }
+
+    setParsing(true);
+    setError(null);
+    setParsedItems([]);
+    setResults(null);
+
+    try {
+      const items = await scanPantryImages(selectedFiles);
+
+      // Initialize items with default actions (always purchase for scanned items)
+      const itemsWithActions = items.map(item => {
+        const hasMatch = item.grocy_product_id && item.grocy_product_id !== null && item.grocy_product_id > 0;
+
+        return {
+          ...item,
+          action: 'purchase',
+          create_if_missing: !hasMatch,
+          editable: true,
+          processed: false
+        };
+      });
+
+      setParsedItems(itemsWithActions);
+    } catch (err) {
+      setError(err.response?.data?.detail || 'Failed to scan images. Make sure vision model is configured in Settings.');
+      console.error('Scan error:', err);
+    } finally {
+      setParsing(false);
+    }
+  };
 
   const handleParse = async () => {
     if (!inputText.trim()) {
@@ -23,12 +95,12 @@ function InventoryManager() {
 
     try {
       const items = await parseInventoryText(inputText, actionType);
-      
+
       // Initialize items with default actions
       const itemsWithActions = items.map(item => {
         // Check if product is matched (has a valid product ID)
         const hasMatch = item.grocy_product_id && item.grocy_product_id !== null && item.grocy_product_id > 0;
-        
+
         return {
           ...item,
           action: actionType,
@@ -38,7 +110,7 @@ function InventoryManager() {
           processed: false
         };
       });
-      
+
       setParsedItems(itemsWithActions);
     } catch (err) {
       setError(err.response?.data?.detail || 'Failed to parse text. Check your backend connection.');
@@ -163,6 +235,7 @@ function InventoryManager() {
     setParsedItems([]);
     setError(null);
     setResults(null);
+    handleClearFiles();
   };
 
   const getConfidenceBadge = (confidence) => {
@@ -187,66 +260,197 @@ function InventoryManager() {
           Inventory Manager
         </h2>
         <p className="text-gray-400 mb-4">
-          Paste receipts, shopping lists, or ingredient lists. The LLM will parse and match items to your Grocy inventory.
+          Add items to your Grocy inventory by pasting text or scanning photos of your pantry/fridge.
         </p>
 
-        {/* Action Type Selection */}
+        {/* Input Mode Toggle */}
         <div className="mb-4">
-          <label className="block text-sm font-medium mb-2">Action Type</label>
+          <label className="block text-sm font-medium mb-2">Input Method</label>
           <div className="grid grid-cols-2 gap-2">
             <button
-              onClick={() => setActionType('purchase')}
-              className={`px-4 py-2 rounded-lg transition-colors ${
-                actionType === 'purchase'
-                  ? 'bg-green-600 text-white'
+              onClick={() => setInputMode('text')}
+              className={`px-4 py-3 rounded-lg transition-colors flex items-center justify-center ${
+                inputMode === 'text'
+                  ? 'bg-elzar-orange text-white'
                   : 'bg-gray-700 text-gray-300 hover:bg-gray-600'
               }`}
             >
-              📥 Purchase (Add to Stock)
+              <span className="mr-2">📝</span> Paste Text
             </button>
             <button
-              onClick={() => setActionType('consume')}
-              className={`px-4 py-2 rounded-lg transition-colors ${
-                actionType === 'consume'
-                  ? 'bg-red-600 text-white'
+              onClick={() => setInputMode('scan')}
+              className={`px-4 py-3 rounded-lg transition-colors flex items-center justify-center ${
+                inputMode === 'scan'
+                  ? 'bg-elzar-orange text-white'
                   : 'bg-gray-700 text-gray-300 hover:bg-gray-600'
               }`}
             >
-              📤 Consume (Remove from Stock)
+              <span className="mr-2">📷</span> Scan Photos
             </button>
           </div>
         </div>
 
-        {/* Text Input */}
-        <div className="mb-4">
-          <label className="block text-sm font-medium mb-2">Paste Text</label>
-          <textarea
-            value={inputText}
-            onChange={(e) => setInputText(e.target.value)}
-            placeholder="Paste your receipt, shopping list, or ingredient list here...&#10;&#10;Example:&#10;1 gallon 2% milk&#10;2 lbs organic bananas&#10;1 dozen eggs&#10;16 oz pasta"
-            rows="8"
-            className="w-full bg-gray-700 border border-gray-600 rounded-lg px-4 py-2 focus:ring-2 focus:ring-elzar-red font-mono text-sm"
-          />
-        </div>
+        {/* Text Input Mode */}
+        {inputMode === 'text' && (
+          <>
+            {/* Action Type Selection */}
+            <div className="mb-4">
+              <label className="block text-sm font-medium mb-2">Action Type</label>
+              <div className="grid grid-cols-2 gap-2">
+                <button
+                  onClick={() => setActionType('purchase')}
+                  className={`px-4 py-2 rounded-lg transition-colors ${
+                    actionType === 'purchase'
+                      ? 'bg-green-600 text-white'
+                      : 'bg-gray-700 text-gray-300 hover:bg-gray-600'
+                  }`}
+                >
+                  📥 Purchase (Add to Stock)
+                </button>
+                <button
+                  onClick={() => setActionType('consume')}
+                  className={`px-4 py-2 rounded-lg transition-colors ${
+                    actionType === 'consume'
+                      ? 'bg-red-600 text-white'
+                      : 'bg-gray-700 text-gray-300 hover:bg-gray-600'
+                  }`}
+                >
+                  📤 Consume (Remove from Stock)
+                </button>
+              </div>
+            </div>
 
-        {/* Parse Button */}
-        <div className="flex space-x-2">
-          <button
-            onClick={handleParse}
-            disabled={parsing || !inputText.trim()}
-            className="bg-elzar-orange hover:bg-orange-600 disabled:bg-gray-600 text-white font-semibold py-2 px-6 rounded-lg transition-colors"
-          >
-            {parsing ? '🔄 Parsing...' : '🧠 Parse with LLM'}
-          </button>
-          {parsedItems.length > 0 && (
-            <button
-              onClick={handleClear}
-              className="bg-gray-700 hover:bg-gray-600 text-white font-semibold py-2 px-6 rounded-lg transition-colors"
-            >
-              Clear
-            </button>
-          )}
-        </div>
+            {/* Text Input */}
+            <div className="mb-4">
+              <label className="block text-sm font-medium mb-2">Paste Text</label>
+              <textarea
+                value={inputText}
+                onChange={(e) => setInputText(e.target.value)}
+                placeholder="Paste your receipt, shopping list, or ingredient list here...&#10;&#10;Example:&#10;1 gallon 2% milk&#10;2 lbs organic bananas&#10;1 dozen eggs&#10;16 oz pasta"
+                rows="8"
+                className="w-full bg-gray-700 border border-gray-600 rounded-lg px-4 py-2 focus:ring-2 focus:ring-elzar-red font-mono text-sm"
+              />
+            </div>
+
+            {/* Parse Button */}
+            <div className="flex space-x-2">
+              <button
+                onClick={handleParse}
+                disabled={parsing || !inputText.trim()}
+                className="bg-elzar-orange hover:bg-orange-600 disabled:bg-gray-600 text-white font-semibold py-2 px-6 rounded-lg transition-colors"
+              >
+                {parsing ? '🔄 Parsing...' : '🧠 Parse with LLM'}
+              </button>
+              {parsedItems.length > 0 && (
+                <button
+                  onClick={handleClear}
+                  className="bg-gray-700 hover:bg-gray-600 text-white font-semibold py-2 px-6 rounded-lg transition-colors"
+                >
+                  Clear
+                </button>
+              )}
+            </div>
+          </>
+        )}
+
+        {/* Scan Photos Mode */}
+        {inputMode === 'scan' && (
+          <>
+            <div className="mb-4">
+              <label className="block text-sm font-medium mb-2">Upload Photos</label>
+              <p className="text-xs text-gray-400 mb-3">
+                Take photos of your pantry, fridge, or shelves. The AI will identify food items and match them to your Grocy products.
+              </p>
+
+              {/* Hidden file input */}
+              <input
+                type="file"
+                ref={fileInputRef}
+                onChange={handleFileSelect}
+                accept="image/jpeg,image/png,image/webp"
+                multiple
+                className="hidden"
+              />
+
+              {/* Upload area */}
+              <div
+                onClick={() => fileInputRef.current?.click()}
+                className="border-2 border-dashed border-gray-600 rounded-lg p-8 text-center cursor-pointer hover:border-elzar-orange hover:bg-gray-700/50 transition-colors"
+              >
+                <div className="text-4xl mb-2">📷</div>
+                <p className="text-gray-300 font-medium">Click to select photos</p>
+                <p className="text-gray-500 text-sm mt-1">or drag and drop</p>
+                <p className="text-gray-500 text-xs mt-2">JPEG, PNG, WebP (max 20MB each)</p>
+              </div>
+
+              {/* Image previews */}
+              {previewUrls.length > 0 && (
+                <div className="mt-4">
+                  <div className="flex justify-between items-center mb-2">
+                    <span className="text-sm font-medium">{selectedFiles.length} photo(s) selected</span>
+                    <button
+                      onClick={handleClearFiles}
+                      className="text-xs text-gray-400 hover:text-white"
+                    >
+                      Clear all
+                    </button>
+                  </div>
+                  <div className="grid grid-cols-3 sm:grid-cols-4 md:grid-cols-5 gap-2">
+                    {previewUrls.map((url, index) => (
+                      <div key={index} className="relative group">
+                        <img
+                          src={url}
+                          alt={`Preview ${index + 1}`}
+                          className="w-full h-24 object-cover rounded-lg"
+                        />
+                        <button
+                          onClick={() => handleRemoveFile(index)}
+                          className="absolute top-1 right-1 bg-red-600 text-white rounded-full w-5 h-5 text-xs flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity"
+                        >
+                          ×
+                        </button>
+                      </div>
+                    ))}
+                    {/* Add more button */}
+                    <div
+                      onClick={() => fileInputRef.current?.click()}
+                      className="w-full h-24 border-2 border-dashed border-gray-600 rounded-lg flex items-center justify-center cursor-pointer hover:border-elzar-orange hover:bg-gray-700/50 transition-colors"
+                    >
+                      <span className="text-2xl text-gray-500">+</span>
+                    </div>
+                  </div>
+                </div>
+              )}
+            </div>
+
+            {/* Scan Button */}
+            <div className="flex space-x-2">
+              <button
+                onClick={handleScanImages}
+                disabled={parsing || selectedFiles.length === 0}
+                className="bg-elzar-orange hover:bg-orange-600 disabled:bg-gray-600 text-white font-semibold py-2 px-6 rounded-lg transition-colors"
+              >
+                {parsing ? '🔄 Scanning...' : '📷 Scan with Vision AI'}
+              </button>
+              {parsedItems.length > 0 && (
+                <button
+                  onClick={handleClear}
+                  className="bg-gray-700 hover:bg-gray-600 text-white font-semibold py-2 px-6 rounded-lg transition-colors"
+                >
+                  Clear
+                </button>
+              )}
+            </div>
+
+            {/* Vision model note */}
+            <div className="mt-4 bg-blue-900 border border-blue-700 rounded-lg p-3 text-blue-200">
+              <p className="text-xs">
+                💡 <strong>Tip:</strong> Make sure a vision-capable model is configured in Settings.
+                GPT-4o, Gemini, and Claude all support image analysis.
+              </p>
+            </div>
+          </>
+        )}
 
         {error && (
           <div className="mt-4 bg-red-900 border border-red-700 rounded-lg p-4 text-red-200">

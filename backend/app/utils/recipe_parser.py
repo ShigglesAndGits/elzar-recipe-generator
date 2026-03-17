@@ -1,5 +1,26 @@
 import re
-from typing import Optional, Dict, Any
+from typing import Optional, Dict, Any, List
+
+
+# Canonical nutrient list for rating recipes on a 1-10 scale.
+# These are the nutrients tracked by the nutritional dashboard.
+NUTRIENTS = [
+    "Protein",
+    "Carbs",
+    "Fiber",
+    "Healthy Fats",
+    "Vitamin A",
+    "Vitamin C",
+    "Vitamin D",
+    "Vitamin B12",
+    "Vitamin K",
+    "Iron",
+    "Calcium",
+    "Potassium",
+    "Magnesium",
+    "Zinc",
+    "Omega-3",
+]
 
 
 def extract_metadata_from_recipe(recipe_text: str) -> Dict[str, Any]:
@@ -97,7 +118,39 @@ def extract_metadata_from_recipe(recipe_text: str) -> Dict[str, Any]:
             except ValueError:
                 pass
 
+    # Extract nutrient ratings
+    metadata["nutrient_ratings"] = extract_nutrient_ratings(recipe_text)
+
     return metadata
+
+
+def extract_nutrient_ratings(recipe_text: str) -> Dict[str, int]:
+    """
+    Extract nutrient density ratings (1-10) from the NUTRITION section of recipe metadata.
+    Format expected: 'Nutrient: N/10' or 'Nutrient: N'
+    """
+    ratings = {}
+
+    # Look for NUTRITION section in metadata block
+    nutrition_match = re.search(
+        r'NUTRITION:\s*(.*?)(?:---|$)',
+        recipe_text,
+        re.DOTALL | re.IGNORECASE
+    )
+    if not nutrition_match:
+        return ratings
+
+    nutrition_text = nutrition_match.group(1)
+
+    for nutrient in NUTRIENTS:
+        # Match patterns like "Protein: 8/10" or "Protein: 8"
+        pattern = re.escape(nutrient) + r':\s*(\d{1,2})(?:/10)?'
+        match = re.search(pattern, nutrition_text, re.IGNORECASE)
+        if match:
+            val = int(match.group(1))
+            ratings[nutrient] = max(1, min(10, val))
+
+    return ratings
 
 
 def format_recipe_for_download(

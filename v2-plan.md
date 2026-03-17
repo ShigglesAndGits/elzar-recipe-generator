@@ -196,11 +196,18 @@ services behind them.
   when a recipe involves a bulk-prep opportunity and suggests making extra to freeze.
   No dedicated feature needed — this is exactly what conversational planning is for.
 
-**13. Nutritional Awareness Dashboard** (enhancement #11)
-- Per-portion calorie/macro estimates
-- Freezer-wide nutritional summary
-- Gap flagging (low fiber, heavy sodium, etc.)
-- Daily calorie planning across multiple meals
+**13. Nutritional Awareness Dashboard** (enhancement #11) — COMPLETED
+- Nutrient density rating system: 15 nutrients rated 1-10 (not grams — how good a source)
+- Canonical nutrients: Protein, Carbs, Fiber, Healthy Fats, Vitamins A/C/D/B12/K,
+  Iron, Calcium, Potassium, Magnesium, Zinc, Omega-3
+- Ratings generated automatically by LLM during recipe creation (added to METADATA prompt)
+- `recipe_nutrient_ratings` table with per-recipe per-nutrient storage
+- `extract_nutrient_ratings()` parser in recipe_parser.py
+- Nutrition API: `/api/nutrition/overview`, `/api/nutrition/recipe/{id}`, `/api/nutrition/nutrients`
+- Chat tool: `get_nutritional_overview` — shows nutrient bars and gap alerts
+- Dashboard page: color-coded bar chart, gap detection (below 4/10), 7/14/30 day windows,
+  per-recipe breakdown with expandable nutrient cards
+- New "Nutrition" nav item between Inventory and History
 
 ---
 

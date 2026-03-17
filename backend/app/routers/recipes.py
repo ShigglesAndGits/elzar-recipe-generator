@@ -143,10 +143,15 @@ async def generate_recipe(request: RecipeGenerationRequest):
         
         # Save to database
         recipe_id = await db.create_recipe(recipe_data)
-        
+
+        # Save nutrient ratings if extracted
+        nutrient_ratings = extracted_metadata.get("nutrient_ratings", {})
+        if nutrient_ratings:
+            await db.save_nutrient_ratings(recipe_id, nutrient_ratings)
+
         # Clean up old recipes if needed
         await db.cleanup_old_recipes(config["max_recipe_history"])
-        
+
         # Get the saved recipe
         saved_recipe = await db.get_recipe(recipe_id)
         
@@ -326,8 +331,14 @@ async def regenerate_recipe(recipe_id: int):
         }
         
         new_recipe_id = await db.create_recipe(recipe_data)
+
+        # Save nutrient ratings if extracted
+        nutrient_ratings = extracted_metadata.get("nutrient_ratings", {})
+        if nutrient_ratings:
+            await db.save_nutrient_ratings(new_recipe_id, nutrient_ratings)
+
         await db.cleanup_old_recipes(config["max_recipe_history"])
-        
+
         # Get the saved recipe
         saved_recipe = await db.get_recipe(new_recipe_id)
         

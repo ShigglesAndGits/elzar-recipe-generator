@@ -739,6 +739,7 @@ function ToolResultBadge({ result }) {
     update_user_preferences: '👤',
     log_debrief: '📝',
     get_debriefs: '📊',
+    get_nutritional_overview: '🥗',
   };
 
   const icon = toolIcons[result.tool] || '🔧';

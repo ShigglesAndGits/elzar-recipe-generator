@@ -24,6 +24,14 @@ Elzar is a self-hosted web application that generates creative recipes based on 
 - **Iterative Recipe Editing**: Edit recipes through conversation — "make it spicier" or "swap chicken for tofu." Fork locked recipes as variants automatically
 - **Cooking Debrief Loop**: Tell Elzar what worked, what flopped, and what was wasted. Recent debriefs feed into future planning for continuously improving meal plans
 
+### 🥗 Nutritional Dashboard (v2.0)
+- **Nutrient Density Ratings**: Every recipe is automatically rated 1-10 for 15 nutrients (protein, fiber, vitamins A/C/D/B12/K, iron, calcium, potassium, magnesium, zinc, omega-3, etc.)
+- **Not calorie counting** — rates how good a *source* of each nutrient a recipe is (an orange is 10/10 vitamin C, lean turkey is 10/10 protein)
+- **Aggregate View**: See average nutrient coverage across 7/14/30 day windows with color-coded bars
+- **Gap Detection**: Automatically flags nutrients consistently below 4/10 across recent meals
+- **Per-Recipe Breakdown**: Expand individual recipes to see their full nutrient profile
+- **Chat Integration**: Ask Elzar "how's my nutrition looking?" to get an overview via `get_nutritional_overview` tool
+
 ### 🍳 Quick Recipe (Generator)
 - **Smart Inventory Integration**: Automatically pulls available ingredients from Grocy
 - **AI-Powered Creativity**: Uses OpenAI-compatible LLMs (OpenRouter, Ollama, etc.) to generate unique recipes
@@ -170,6 +178,7 @@ elzar-recipe-generator/
 │   │   │   ├── profiles.py            # Dietary profiles
 │   │   │   ├── ideas.py               # Ideas brainstorm board
 │   │   │   ├── preferences.py         # Household preferences
+│   │   │   ├── nutrition.py            # Nutritional dashboard API (v2.0)
 │   │   │   ├── prepcook.py            # Prep cook sessions (v2.0)
 │   │   │   └── settings.py            # Settings & testing
 │   │   ├── services/
@@ -451,6 +460,8 @@ tail -f /root/elzar-recipe-generator/frontend.log
 - [x] Iterative recipe editing with variant forking (v2.0)
 - [x] Grocy-free experience audit (v2.0)
 - [x] Post-session debrief & feedback loop (v2.0)
+
+- [x] Nutritional awareness dashboard with density ratings (v2.0)
 
 ### Planned 🚧
 - [ ] SSE streaming for chat responses

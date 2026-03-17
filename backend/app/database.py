@@ -267,6 +267,26 @@ class Database:
                 ON debriefs(created_at DESC)
             """)
 
+            # Recipe nutrient ratings table
+            await db.execute("""
+                CREATE TABLE IF NOT EXISTS recipe_nutrient_ratings (
+                    id INTEGER PRIMARY KEY AUTOINCREMENT,
+                    recipe_id INTEGER NOT NULL,
+                    nutrient TEXT NOT NULL,
+                    rating INTEGER NOT NULL CHECK(rating BETWEEN 1 AND 10),
+                    FOREIGN KEY (recipe_id) REFERENCES recipes(id) ON DELETE CASCADE,
+                    UNIQUE(recipe_id, nutrient)
+                )
+            """)
+            await db.execute("""
+                CREATE INDEX IF NOT EXISTS idx_nutrient_ratings_recipe_id
+                ON recipe_nutrient_ratings(recipe_id)
+            """)
+            await db.execute("""
+                CREATE INDEX IF NOT EXISTS idx_nutrient_ratings_nutrient
+                ON recipe_nutrient_ratings(nutrient)
+            """)
+
             await db.commit()
 
     # Recipe operations
@@ -1074,6 +1094,81 @@ class Database:
             )
             rows = await cursor.fetchall()
             return [dict(row) for row in rows]
+
+    # Nutrient rating operations
+    async def save_nutrient_ratings(self, recipe_id: int, ratings: Dict[str, int]) -> None:
+        """Save nutrient ratings for a recipe. Upserts — safe to call multiple times."""
+        async with aiosqlite.connect(self.db_path) as db:
+            for nutrient, rating in ratings.items():
+                await db.execute("""
+                    INSERT INTO recipe_nutrient_ratings (recipe_id, nutrient, rating)
+                    VALUES (?, ?, ?)
+                    ON CONFLICT(recipe_id, nutrient) DO UPDATE SET rating = excluded.rating
+                """, (recipe_id, nutrient, max(1, min(10, rating))))
+            await db.commit()
+
+    async def get_nutrient_ratings(self, recipe_id: int) -> Dict[str, int]:
+        """Get nutrient ratings for a single recipe."""
+        async with aiosqlite.connect(self.db_path) as db:
+            db.row_factory = aiosqlite.Row
+            cursor = await db.execute(
+                "SELECT nutrient, rating FROM recipe_nutrient_ratings WHERE recipe_id = ?",
+                (recipe_id,)
+            )
+            rows = await cursor.fetchall()
+            return {row["nutrient"]: row["rating"] for row in rows}
+
+    async def get_nutritional_overview(self, days: int = 14, limit: int = 50) -> Dict[str, Any]:
+        """
+        Aggregate nutrient ratings across recent recipes.
+        Returns per-nutrient averages, recipe count, and per-recipe breakdown.
+        """
+        async with aiosqlite.connect(self.db_path) as db:
+            db.row_factory = aiosqlite.Row
+            # Get recent recipes with ratings
+            cursor = await db.execute("""
+                SELECT r.id, r.recipe_text, r.cuisine, r.created_at,
+                       rnr.nutrient, rnr.rating
+                FROM recipes r
+                JOIN recipe_nutrient_ratings rnr ON r.id = rnr.recipe_id
+                WHERE r.created_at >= datetime('now', ? || ' days')
+                ORDER BY r.created_at DESC
+            """, (f"-{days}",))
+            rows = await cursor.fetchall()
+
+            if not rows:
+                return {"recipes_analyzed": 0, "averages": {}, "gaps": [], "recipes": []}
+
+            # Aggregate
+            from collections import defaultdict
+            nutrient_sums = defaultdict(list)
+            recipes_seen = {}
+            for row in rows:
+                rid = row["id"]
+                if rid not in recipes_seen:
+                    recipes_seen[rid] = {
+                        "id": rid,
+                        "cuisine": row["cuisine"],
+                        "created_at": row["created_at"],
+                        "ratings": {},
+                    }
+                recipes_seen[rid]["ratings"][row["nutrient"]] = row["rating"]
+                nutrient_sums[row["nutrient"]].append(row["rating"])
+
+            averages = {
+                nutrient: round(sum(vals) / len(vals), 1)
+                for nutrient, vals in nutrient_sums.items()
+            }
+            # Gaps: nutrients averaging below 4
+            gaps = [n for n, avg in averages.items() if avg < 4.0]
+
+            return {
+                "recipes_analyzed": len(recipes_seen),
+                "days": days,
+                "averages": averages,
+                "gaps": gaps,
+                "recipes": list(recipes_seen.values()),
+            }
 
 
 # Global database instance

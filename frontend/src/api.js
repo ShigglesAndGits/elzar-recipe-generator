@@ -397,4 +397,20 @@ export const deleteChatSession = async (sessionId) => {
   return response.data;
 };
 
+// Nutrition APIs (v2.0)
+export const getNutrientList = async () => {
+  const response = await api.get('/api/nutrition/nutrients');
+  return response.data;
+};
+
+export const getNutritionalOverview = async (days = 14) => {
+  const response = await api.get('/api/nutrition/overview', { params: { days } });
+  return response.data;
+};
+
+export const getRecipeNutrition = async (recipeId) => {
+  const response = await api.get(`/api/nutrition/recipe/${recipeId}`);
+  return response.data;
+};
+
 export default api;

@@ -9,6 +9,7 @@ from ..database import db
 from ..services.grocy_client import GrocyClient
 from ..services.llm_client import LLMClient
 from ..utils.config_manager import get_effective_config
+from ..utils.recipe_parser import extract_metadata_from_recipe
 
 router = APIRouter(prefix="/api/chat", tags=["chat"])
 
@@ -320,6 +321,20 @@ TOOL_DEFINITIONS = [
             }
         }
     },
+    {
+        "type": "function",
+        "function": {
+            "name": "get_nutritional_overview",
+            "description": "Get a nutritional overview of recent meals. Shows average nutrient density ratings (1-10 scale) across recent recipes and flags nutritional gaps.",
+            "parameters": {
+                "type": "object",
+                "properties": {
+                    "days": {"type": "integer", "description": "Number of days to look back (default 14)"},
+                },
+                "required": []
+            }
+        }
+    },
 ]
 
 
@@ -374,6 +389,8 @@ async def execute_tool(
             return await _tool_log_debrief(arguments)
         elif tool_name == "get_debriefs":
             return await _tool_get_debriefs(arguments)
+        elif tool_name == "get_nutritional_overview":
+            return await _tool_get_nutritional_overview(arguments)
         else:
             return f"Unknown tool: {tool_name}"
     except Exception as e:
@@ -427,41 +444,27 @@ async def _tool_create_recipe(args: dict, config: dict, session_params: dict) ->
 
     recipe_text = await llm.generate_recipe(inventory, request_params, dietary_profiles, user_preferences)
 
-    # Parse metadata from recipe text
-    calories = None
-    time_minutes = None
-    estimated_cost = None
-    cuisine = args.get("cuisine")
-
-    metadata_match = re.search(r"METADATA:(.*?)---", recipe_text, re.DOTALL)
-    if metadata_match:
-        meta = metadata_match.group(1)
-        cal_match = re.search(r"Calories:\s*(\d+)", meta)
-        if cal_match:
-            calories = int(cal_match.group(1))
-        time_match = re.search(r"Total Time:\s*(\d+)", meta)
-        if time_match:
-            time_minutes = int(time_match.group(1))
-        cost_match = re.search(r"Estimated Cost:\s*\$?([\d.]+)", meta)
-        if cost_match:
-            estimated_cost = float(cost_match.group(1))
-        cuisine_match = re.search(r"Cuisine:\s*(.+)", meta)
-        if cuisine_match:
-            cuisine = cuisine_match.group(1).strip()
+    # Parse metadata using shared parser
+    extracted = extract_metadata_from_recipe(recipe_text)
 
     recipe_id = await db.create_recipe({
         "recipe_text": recipe_text,
-        "cuisine": cuisine,
-        "time_minutes": time_minutes,
-        "effort_level": session_params.get("effort_level"),
-        "calories_per_serving": calories,
-        "estimated_cost": estimated_cost,
+        "cuisine": extracted.get("cuisine") or args.get("cuisine"),
+        "time_minutes": extracted.get("time_minutes"),
+        "effort_level": extracted.get("effort_level") or session_params.get("effort_level"),
+        "calories_per_serving": extracted.get("calories_per_serving"),
+        "estimated_cost": extracted.get("estimated_cost"),
         "used_external_ingredients": True,
         "prioritize_expiring": session_params.get("prioritize_expiring", False),
         "active_profiles": session_params.get("active_profiles", []),
         "user_prompt": args.get("description"),
         "llm_model": config["llm_model"],
     })
+
+    # Save nutrient ratings if extracted
+    nutrient_ratings = extracted.get("nutrient_ratings", {})
+    if nutrient_ratings:
+        await db.save_nutrient_ratings(recipe_id, nutrient_ratings)
 
     return f"Recipe created (ID: {recipe_id}).\n\n{recipe_text}"
 
@@ -907,6 +910,38 @@ async def _tool_get_debriefs(args: dict) -> str:
             lines.append(f"Wasted: {d['what_was_wasted']}")
         if d.get("notes"):
             lines.append(f"Notes: {d['notes']}")
+    return "\n".join(lines)
+
+
+async def _tool_get_nutritional_overview(args: dict) -> str:
+    days = args.get("days", 14)
+    overview = await db.get_nutritional_overview(days=days)
+
+    if overview["recipes_analyzed"] == 0:
+        return f"No recipes with nutrient ratings found in the last {days} days. Nutrient ratings are generated automatically when recipes are created."
+
+    lines = [
+        f"Nutritional overview — last {days} days ({overview['recipes_analyzed']} recipes):",
+        "",
+        "Average nutrient density (1-10 scale):",
+    ]
+
+    # Sort by rating to make gaps obvious
+    sorted_avgs = sorted(overview["averages"].items(), key=lambda x: x[1])
+    for nutrient, avg in sorted_avgs:
+        bar = "█" * int(avg) + "░" * (10 - int(avg))
+        flag = " ⚠️ LOW" if avg < 4.0 else ""
+        lines.append(f"  {nutrient:15s} {bar} {avg}/10{flag}")
+
+    if overview["gaps"]:
+        lines.extend([
+            "",
+            f"Nutritional gaps (below 4.0): {', '.join(overview['gaps'])}",
+            "Consider recipes rich in these nutrients for upcoming meals.",
+        ])
+    else:
+        lines.extend(["", "No significant nutritional gaps detected."])
+
     return "\n".join(lines)
 
 

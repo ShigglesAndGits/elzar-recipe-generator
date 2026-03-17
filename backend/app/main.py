@@ -3,7 +3,7 @@ from fastapi.middleware.cors import CORSMiddleware
 from contextlib import asynccontextmanager
 
 from .database import db
-from .routers import recipes, history, profiles, preferences, ideas, settings, inventory, mealplans, prepcook, chat
+from .routers import recipes, history, profiles, preferences, ideas, settings, inventory, mealplans, prepcook, chat, nutrition
 
 
 @asynccontextmanager
@@ -45,6 +45,7 @@ app.include_router(inventory.router)
 app.include_router(mealplans.router)
 app.include_router(prepcook.router)
 app.include_router(chat.router)
+app.include_router(nutrition.router)
 
 
 @app.get("/")

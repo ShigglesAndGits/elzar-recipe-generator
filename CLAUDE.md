@@ -36,11 +36,11 @@ docker-compose up -d --build
 
 **Backend** (`backend/app/`):
 - **main.py** — FastAPI app, CORS (allows all origins), mounts all routers under `/api/`
-- **database.py** — Async SQLite via aiosqlite. Tables: `recipes`, `dietary_profiles`, `meal_plans`, `meal_plan_recipes`, `settings`. Schema migrations are inline ALTER TABLE statements.
+- **database.py** — Async SQLite via aiosqlite. Tables: `recipes`, `dietary_profiles`, `meal_plans`, `meal_plan_recipes`, `settings`, `ideas`, `chat_sessions`, `chat_messages`, `prep_cook_sessions`, `debriefs`, `recipe_nutrient_ratings`, `user_preferences`. Schema migrations are inline ALTER TABLE statements.
 - **models.py** — Pydantic request/response models
 - **config.py** — `Settings` class using pydantic-settings, reads from env vars
 - **utils/config_manager.py** — Hybrid config: env vars provide defaults, `settings` DB table provides runtime overrides via `get_effective_config()`. Changes take effect immediately without restart.
-- **utils/recipe_parser.py** — Extracts metadata (cuisine, time, effort, calories, cost) from LLM recipe text
+- **utils/recipe_parser.py** — Extracts metadata (cuisine, time, effort, calories, cost, nutrient ratings) from LLM recipe text. Defines `NUTRIENTS` canonical list.
 
 **Backend Services** (`backend/app/services/`):
 - **grocy_client.py** — Grocy API wrapper (stock, products, recipes, shopping lists, unit conversions)
@@ -49,13 +49,13 @@ docker-compose up -d --build
 - **vision_client.py** — Vision model integration for pantry image scanning
 - **notification.py** — Apprise notification wrapper
 
-**Backend Routers** (`backend/app/routers/`): `recipes`, `history`, `profiles`, `settings`, `inventory`, `mealplans`
+**Backend Routers** (`backend/app/routers/`): `recipes`, `history`, `profiles`, `preferences`, `ideas`, `settings`, `inventory`, `mealplans`, `prepcook`, `chat`, `nutrition`
 
 **Frontend** (`frontend/src/`):
 - **api.js** — Axios client; base URL derived from `window.location` for proxy compatibility
 - **App.jsx** — React Router navigation, sidebar, responsive layout
 - **contexts/ServiceStatusContext.jsx** — Provides Grocy/LLM connection status to components
-- **Pages**: Generator, MealPlanner, InventoryManager, History, Profiles, Settings
+- **Pages**: Chat (landing), Generator, MealPlanner, InventoryManager, Ideas, Nutrition, History, Profiles, Settings
 
 ## Key Configuration
 

@@ -1,7 +1,9 @@
 import React, { useState, useEffect } from 'react';
+import { useServiceStatus } from '../contexts/ServiceStatusContext';
 import { getConfig, updateConfig, testGrocyConnection, testLLMConnection, setupUnitConversions, setupLocations } from '../api';
 
 function Settings() {
+  const { grocyConfigured } = useServiceStatus();
   const [config, setConfig] = useState(null);
   const [loading, setLoading] = useState(true);
   const [kioskMode, setKioskMode] = useState(false);
@@ -409,6 +411,9 @@ function Settings() {
                   className="w-full bg-gray-700 border border-gray-600 rounded-lg px-4 py-2 focus:ring-2 focus:ring-elzar-red"
                   placeholder="google/gemini-2.0-flash-exp:free"
                 />
+                <p className="text-xs text-yellow-400 mt-1">
+                  The Chat feature requires a model with tool/function call support. Quick Recipe works with any model.
+                </p>
               </div>
 
               <div>
@@ -663,8 +668,16 @@ function Settings() {
 
       {/* Grocy Unit Conversions Setup */}
       <div className="bg-gray-800 rounded-lg p-6 shadow-lg">
-        <h2 className="text-2xl font-bold mb-4">Grocy Unit Conversions</h2>
-        
+        <h2 className="text-2xl font-bold mb-4">Grocy Setup</h2>
+
+        {!grocyConfigured && (
+          <div className="mb-4 bg-yellow-900/50 border border-yellow-700 rounded-lg p-4 text-yellow-200">
+            <p className="text-sm">
+              Grocy is not connected. Configure your Grocy URL and API key above, then test the connection before using these setup tools.
+            </p>
+          </div>
+        )}
+
         <p className="text-gray-300 mb-4">
           Set up comprehensive kitchen unit conversions in Grocy for automatic quantity conversion.
           This creates all common cooking units and conversions including metric, imperial, and cross-system conversions.
@@ -709,8 +722,8 @@ function Settings() {
           
           <button
             onClick={handleSetupUnitConversions}
-            disabled={settingUpUnits}
-            className="w-full bg-gradient-to-r from-blue-600 to-purple-600 hover:from-blue-700 hover:to-purple-700 disabled:from-gray-600 disabled:to-gray-600 text-white font-semibold px-6 py-3 rounded-lg transition-all transform hover:scale-105"
+            disabled={settingUpUnits || !grocyConfigured}
+            className="w-full bg-gradient-to-r from-blue-600 to-purple-600 hover:from-blue-700 hover:to-purple-700 disabled:from-gray-600 disabled:to-gray-600 text-white font-semibold px-6 py-3 rounded-lg transition-all transform hover:scale-105 disabled:transform-none"
           >
             {settingUpUnits ? '⏳ Setting up units...' : '🚀 Setup All Kitchen Units & Conversions'}
           </button>
@@ -743,8 +756,8 @@ function Settings() {
           
           <button
             onClick={handleSetupLocations}
-            disabled={settingUpLocations}
-            className="w-full bg-gradient-to-r from-green-600 to-teal-600 hover:from-green-700 hover:to-teal-700 disabled:from-gray-600 disabled:to-gray-600 text-white font-semibold px-6 py-3 rounded-lg transition-all transform hover:scale-105"
+            disabled={settingUpLocations || !grocyConfigured}
+            className="w-full bg-gradient-to-r from-green-600 to-teal-600 hover:from-green-700 hover:to-teal-700 disabled:from-gray-600 disabled:to-gray-600 text-white font-semibold px-6 py-3 rounded-lg transition-all transform hover:scale-105 disabled:transform-none"
           >
             {settingUpLocations ? '⏳ Setting up locations...' : '📦 Setup Storage Locations'}
           </button>
@@ -776,7 +789,7 @@ function Settings() {
             <strong>Elzar</strong> - The Grocy Recipe Generator
           </p>
           <p>
-            Version 1.0.0
+            Version 2.0.0
           </p>
           <p className="text-sm">
             BAM! Generate amazing recipes from your Grocy inventory using AI. Elzar helps you reduce food waste, accommodate dietary restrictions, and discover new meals based on what you already have.

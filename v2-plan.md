@@ -165,13 +165,17 @@ services behind them.
 
 ### Phase 4: Polish & Enhancement
 
-**9. Grocy-Free Experience Audit** (enhancement #13)
-- Thorough pass through every page: hide all Grocy-dependent UI when unconfigured
-- Generator: hide Consume, Add Missing, Save to Grocy buttons
-- History: hide Grocy action buttons
-- Settings: collapse Grocy config into expandable "Connect Grocy" section
-- Chat: disable inventory/freezer tool calls, adjust system prompt
-- Goal: clean, complete experience with no dead buttons or "configure Grocy" prompts
+**9. Grocy-Free Experience Audit** (enhancement #13) — COMPLETED
+- Thorough audit of every page for Grocy-dependent UI
+- Generator: Consume, Add Missing, Save to Grocy buttons already hidden (grocyConfigured)
+- History: no Grocy-dependent buttons — already clean
+- Inventory Manager: added full Grocy-not-configured guard with link to Settings
+- Settings: Grocy setup section shows warning banner and disables buttons when unconfigured;
+  added model disclaimer about Chat requiring tool/function call support
+- Chat: inventory/freezer tools auto-filtered; system prompt notes Grocy unavailability;
+  inventory toggles already hidden in collapsible controls
+- MealPlanner: Grocy buttons already wrapped in grocyConfigured check
+- Goal achieved: clean experience with no dead buttons when Grocy not configured
 
 **10. Post-Session Debrief** (enhancement #10)
 - Prompted debrief after prep cook sessions or configurable period

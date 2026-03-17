@@ -418,6 +418,26 @@ class Database:
             await db.commit()
             return bool(new_val)
 
+    async def update_recipe_text(self, recipe_id: int, recipe_text: str) -> bool:
+        """Update recipe text and set last_edited timestamp."""
+        async with aiosqlite.connect(self.db_path) as db:
+            cursor = await db.execute(
+                "UPDATE recipes SET recipe_text = ?, last_edited = CURRENT_TIMESTAMP WHERE id = ?",
+                (recipe_text, recipe_id)
+            )
+            await db.commit()
+            return cursor.rowcount > 0
+
+    async def set_parent_recipe_id(self, recipe_id: int, parent_id: int) -> bool:
+        """Set the parent_recipe_id for a variant recipe."""
+        async with aiosqlite.connect(self.db_path) as db:
+            cursor = await db.execute(
+                "UPDATE recipes SET parent_recipe_id = ? WHERE id = ?",
+                (parent_id, recipe_id)
+            )
+            await db.commit()
+            return cursor.rowcount > 0
+
     async def create_manual_recipe(self, recipe_data: Dict[str, Any]) -> int:
         """Create a manually-entered recipe"""
         async with aiosqlite.connect(self.db_path) as db:

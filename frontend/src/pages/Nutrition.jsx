@@ -232,7 +232,7 @@ function RecipeNutrientCard({ recipe }) {
   const [expanded, setExpanded] = useState(false);
 
   // Compute average rating for quick glance
-  const ratings = Object.values(recipe.ratings);
+  const ratings = Object.values(recipe.ratings || {});
   const avgRating = ratings.length > 0
     ? (ratings.reduce((a, b) => a + b, 0) / ratings.length).toFixed(1)
     : 'N/A';
@@ -265,7 +265,7 @@ function RecipeNutrientCard({ recipe }) {
 
       {expanded && (
         <div className="mt-3 grid grid-cols-3 sm:grid-cols-5 gap-2">
-          {Object.entries(recipe.ratings)
+          {Object.entries(recipe.ratings || {})
             .sort((a, b) => b[1] - a[1])
             .map(([nutrient, rating]) => (
               <div

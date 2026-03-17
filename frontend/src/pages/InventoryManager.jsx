@@ -6,25 +6,7 @@ import { parseInventoryText, purchaseItems, consumeItems, scanPantryImages, getF
 function InventoryManager() {
   const { grocyConfigured } = useServiceStatus();
 
-  if (!grocyConfigured) {
-    return (
-      <div className="max-w-2xl mx-auto">
-        <div className="bg-gray-800 rounded-lg p-8 shadow-lg text-center">
-          <span className="text-6xl mb-4 block">📦</span>
-          <h2 className="text-2xl font-bold mb-3">Inventory Manager</h2>
-          <p className="text-gray-400 mb-6">
-            The Inventory Manager requires a Grocy connection to manage your pantry, fridge, and freezer stock.
-          </p>
-          <Link
-            to="/settings"
-            className="inline-block bg-elzar-red hover:bg-red-600 text-white font-semibold py-3 px-6 rounded-lg transition-colors"
-          >
-            Configure Grocy in Settings
-          </Link>
-        </div>
-      </div>
-    );
-  }
+  // All hooks must be declared before any early returns (React rules of hooks)
   const [inputText, setInputText] = useState('');
   const [actionType, setActionType] = useState('purchase');
   const [inputMode, setInputMode] = useState('text'); // 'text' or 'scan'
@@ -45,10 +27,25 @@ function InventoryManager() {
   const [freezerSearch, setFreezerSearch] = useState('');
   const [consumingId, setConsumingId] = useState(null);
 
-  // Load freezer stock on mount
-  useEffect(() => {
-    loadFreezerStock();
-  }, []);
+  if (!grocyConfigured) {
+    return (
+      <div className="max-w-2xl mx-auto">
+        <div className="bg-gray-800 rounded-lg p-8 shadow-lg text-center">
+          <span className="text-6xl mb-4 block">📦</span>
+          <h2 className="text-2xl font-bold mb-3">Inventory Manager</h2>
+          <p className="text-gray-400 mb-6">
+            The Inventory Manager requires a Grocy connection to manage your pantry, fridge, and freezer stock.
+          </p>
+          <Link
+            to="/settings"
+            className="inline-block bg-elzar-red hover:bg-red-600 text-white font-semibold py-3 px-6 rounded-lg transition-colors"
+          >
+            Configure Grocy in Settings
+          </Link>
+        </div>
+      </div>
+    );
+  }
 
   const loadFreezerStock = async () => {
     setFreezerLoading(true);
@@ -66,6 +63,13 @@ function InventoryManager() {
       setFreezerLoading(false);
     }
   };
+
+  // Load freezer stock on mount (only when Grocy is configured)
+  useEffect(() => {
+    if (grocyConfigured) {
+      loadFreezerStock();
+    }
+  }, [grocyConfigured]);
 
   const handleConsumeFreezer = async (item, amount) => {
     setConsumingId(item.product_id);

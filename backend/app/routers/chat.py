@@ -789,13 +789,7 @@ Return the COMPLETE updated recipe text (not just the changes). Keep the same fo
         return f"Recipe {args['recipe_id']} is locked — created variant (ID: {new_id}) instead.\n\n{edited_text}"
     else:
         # Update in place
-        import aiosqlite
-        async with aiosqlite.connect(db.db_path) as conn:
-            await conn.execute(
-                "UPDATE recipes SET recipe_text = ?, last_edited = CURRENT_TIMESTAMP WHERE id = ?",
-                (edited_text, args["recipe_id"])
-            )
-            await conn.commit()
+        await db.update_recipe_text(args["recipe_id"], edited_text)
         return f"Recipe {args['recipe_id']} updated.\n\n{edited_text}"
 
 
@@ -814,13 +808,7 @@ async def _create_recipe_variant(original: dict, new_text: str, args: dict, conf
         "user_prompt": args.get("instructions", ""),
         "llm_model": config["llm_model"],
     })
-    import aiosqlite
-    async with aiosqlite.connect(db.db_path) as conn:
-        await conn.execute(
-            "UPDATE recipes SET parent_recipe_id = ? WHERE id = ?",
-            (original["id"], new_id)
-        )
-        await conn.commit()
+    await db.set_parent_recipe_id(new_id, original["id"])
     return new_id
 
 
@@ -1300,10 +1288,14 @@ async def get_session_history(session_id: int):
     )
 
 
+class RenameSessionRequest(BaseModel):
+    name: str
+
+
 @router.put("/sessions/{session_id}/name")
-async def rename_session(session_id: int, body: dict):
+async def rename_session(session_id: int, body: RenameSessionRequest):
     """Rename a chat session."""
-    name = body.get("name", "").strip()
+    name = body.name.strip()
     if not name:
         raise HTTPException(status_code=400, detail="Name required")
     success = await db.update_chat_session_name(session_id, name)

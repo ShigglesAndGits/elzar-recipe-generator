@@ -584,7 +584,7 @@ function Chat() {
             )}
 
             {messages.map((msg, idx) => (
-              <MessageBubble key={idx} message={msg} />
+              <MessageBubble key={msg.id || `msg-${idx}`} message={msg} />
             ))}
 
             {sending && (

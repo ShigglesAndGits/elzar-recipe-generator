@@ -1,8 +1,13 @@
 from fastapi import APIRouter, HTTPException
+from pydantic import BaseModel
 from typing import Dict, Any, List
 
 from ..database import db
 from ..utils.recipe_parser import NUTRIENTS
+
+
+class NutrientRatingsRequest(BaseModel):
+    ratings: Dict[str, int]
 
 router = APIRouter(prefix="/api/nutrition", tags=["nutrition"])
 
@@ -31,17 +36,17 @@ async def get_recipe_nutrition(recipe_id: int):
 
 
 @router.post("/recipe/{recipe_id}/rate")
-async def rate_recipe(recipe_id: int, ratings: Dict[str, int]):
+async def rate_recipe(recipe_id: int, body: NutrientRatingsRequest):
     """Manually set or update nutrient ratings for a recipe."""
     recipe = await db.get_recipe(recipe_id)
     if not recipe:
         raise HTTPException(status_code=404, detail="Recipe not found")
 
     # Validate nutrients
-    valid = {r for r in ratings if r in NUTRIENTS}
+    valid = {r for r in body.ratings if r in NUTRIENTS}
     if not valid:
         raise HTTPException(status_code=400, detail="No valid nutrients provided")
 
-    filtered = {k: v for k, v in ratings.items() if k in valid}
+    filtered = {k: v for k, v in body.ratings.items() if k in valid}
     await db.save_nutrient_ratings(recipe_id, filtered)
     return {"message": f"Saved {len(filtered)} nutrient ratings for recipe {recipe_id}"}

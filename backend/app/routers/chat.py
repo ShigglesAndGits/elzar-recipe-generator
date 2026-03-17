@@ -287,6 +287,39 @@ TOOL_DEFINITIONS = [
             }
         }
     },
+    {
+        "type": "function",
+        "function": {
+            "name": "log_debrief",
+            "description": "Record a post-cooking debrief — what was cooked, what worked, what didn't, what was wasted. Use this when the user shares feedback about a meal or cooking session.",
+            "parameters": {
+                "type": "object",
+                "properties": {
+                    "prep_session_id": {"type": "integer", "description": "Optional prep cook session ID this debrief is about"},
+                    "what_was_cooked": {"type": "string", "description": "What the user actually cooked"},
+                    "what_worked": {"type": "string", "description": "What went well — dishes that were hits, techniques that worked"},
+                    "what_didnt_work": {"type": "string", "description": "What went wrong — dishes that flopped, ingredients that were off"},
+                    "what_was_wasted": {"type": "string", "description": "What got thrown away or went unused"},
+                    "notes": {"type": "string", "description": "Any other observations or preferences to remember"},
+                },
+                "required": ["what_was_cooked"]
+            }
+        }
+    },
+    {
+        "type": "function",
+        "function": {
+            "name": "get_debriefs",
+            "description": "Retrieve recent post-cooking debriefs. Use this to learn from past cooking sessions when planning new ones.",
+            "parameters": {
+                "type": "object",
+                "properties": {
+                    "limit": {"type": "integer", "description": "Number of debriefs to retrieve (default 5)"},
+                },
+                "required": []
+            }
+        }
+    },
 ]
 
 
@@ -337,6 +370,10 @@ async def execute_tool(
             return await _tool_get_user_preferences()
         elif tool_name == "update_user_preferences":
             return await _tool_update_user_preferences(arguments)
+        elif tool_name == "log_debrief":
+            return await _tool_log_debrief(arguments)
+        elif tool_name == "get_debriefs":
+            return await _tool_get_debriefs(arguments)
         else:
             return f"Unknown tool: {tool_name}"
     except Exception as e:
@@ -839,6 +876,40 @@ async def _tool_update_user_preferences(args: dict) -> str:
     return "Household preferences updated."
 
 
+async def _tool_log_debrief(args: dict) -> str:
+    debrief_id = await db.create_debrief(args)
+    parts = [f"Debrief #{debrief_id} recorded."]
+    if args.get("what_worked"):
+        parts.append(f"What worked: {args['what_worked']}")
+    if args.get("what_didnt_work"):
+        parts.append(f"What didn't work: {args['what_didnt_work']}")
+    if args.get("what_was_wasted"):
+        parts.append(f"Wasted: {args['what_was_wasted']}")
+    return " | ".join(parts)
+
+
+async def _tool_get_debriefs(args: dict) -> str:
+    limit = args.get("limit", 5)
+    debriefs = await db.get_debriefs(limit=limit)
+    if not debriefs:
+        return "No debriefs recorded yet."
+
+    lines = [f"Recent debriefs ({len(debriefs)}):"]
+    for d in debriefs:
+        lines.append(f"\n--- Debrief #{d['id']} ({d['created_at']}) ---")
+        if d.get("what_was_cooked"):
+            lines.append(f"Cooked: {d['what_was_cooked']}")
+        if d.get("what_worked"):
+            lines.append(f"Worked: {d['what_worked']}")
+        if d.get("what_didnt_work"):
+            lines.append(f"Didn't work: {d['what_didnt_work']}")
+        if d.get("what_was_wasted"):
+            lines.append(f"Wasted: {d['what_was_wasted']}")
+        if d.get("notes"):
+            lines.append(f"Notes: {d['notes']}")
+    return "\n".join(lines)
+
+
 # ---------------------------------------------------------------------------
 # System prompt builder
 # ---------------------------------------------------------------------------
@@ -918,6 +989,22 @@ async def build_system_prompt(
             "NOTE: Grocy inventory is NOT configured. Do not offer to check inventory or "
             "freezer stock. The query_inventory and query_freezer tools are unavailable.",
         ])
+
+    # Recent debriefs (feedback loop)
+    recent_debriefs = await db.get_debriefs(limit=3)
+    if recent_debriefs:
+        parts.extend(["", "RECENT COOKING FEEDBACK (consider when planning):"])
+        for d in recent_debriefs:
+            summary = []
+            if d.get("what_was_cooked"):
+                summary.append(f"Cooked: {d['what_was_cooked']}")
+            if d.get("what_worked"):
+                summary.append(f"Liked: {d['what_worked']}")
+            if d.get("what_didnt_work"):
+                summary.append(f"Didn't work: {d['what_didnt_work']}")
+            if d.get("what_was_wasted"):
+                summary.append(f"Wasted: {d['what_was_wasted']}")
+            parts.append(f"- [{d['created_at'][:10]}] {'; '.join(summary)}")
 
     # Behavioral rules
     parts.extend([

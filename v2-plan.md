@@ -177,11 +177,12 @@ services behind them.
 - MealPlanner: Grocy buttons already wrapped in grocyConfigured check
 - Goal achieved: clean experience with no dead buttons when Grocy not configured
 
-**10. Post-Session Debrief** (enhancement #10)
-- Prompted debrief after prep cook sessions or configurable period
-- Questions: what was eaten vs. planned, what got skipped/wasted, what worked
-- Stored and surfaced to LLM in future planning sessions
-- Chat tool call: `log_debrief`
+**10. Post-Session Debrief** (enhancement #10) — COMPLETED
+- `debriefs` table: stores what was cooked, what worked, what didn't, what was wasted, notes
+- Optional link to prep cook session via `prep_session_id`
+- Chat tool calls: `log_debrief` (record feedback), `get_debriefs` (retrieve past feedback)
+- System prompt injection: 3 most recent debriefs included in every chat, so the LLM
+  learns from past sessions when planning new ones
 - Feedback loop: plan → cook → eat → debrief → better plan
 
 **11. Bulk Ingredient Prep Tracking** (enhancement #6)

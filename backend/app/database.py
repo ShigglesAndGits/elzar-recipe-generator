@@ -248,8 +248,27 @@ class Database:
                 ON chat_messages(session_id)
             """)
 
+            # Debriefs table (post-session feedback)
+            await db.execute("""
+                CREATE TABLE IF NOT EXISTS debriefs (
+                    id INTEGER PRIMARY KEY AUTOINCREMENT,
+                    prep_session_id INTEGER,
+                    what_was_cooked TEXT,
+                    what_worked TEXT,
+                    what_didnt_work TEXT,
+                    what_was_wasted TEXT,
+                    notes TEXT,
+                    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                    FOREIGN KEY (prep_session_id) REFERENCES prep_cook_sessions(id) ON DELETE SET NULL
+                )
+            """)
+            await db.execute("""
+                CREATE INDEX IF NOT EXISTS idx_debriefs_created_at
+                ON debriefs(created_at DESC)
+            """)
+
             await db.commit()
-    
+
     # Recipe operations
     async def create_recipe(self, recipe_data: Dict[str, Any]) -> int:
         """Insert a new recipe and return its ID"""
@@ -1024,6 +1043,37 @@ class Database:
             if row and row["request_params"]:
                 return json.loads(row["request_params"])
             return None
+
+
+    # Debrief operations
+    async def create_debrief(self, debrief_data: Dict[str, Any]) -> int:
+        """Create a new debrief entry and return its ID."""
+        async with aiosqlite.connect(self.db_path) as db:
+            cursor = await db.execute("""
+                INSERT INTO debriefs (prep_session_id, what_was_cooked, what_worked,
+                                      what_didnt_work, what_was_wasted, notes)
+                VALUES (?, ?, ?, ?, ?, ?)
+            """, (
+                debrief_data.get("prep_session_id"),
+                debrief_data.get("what_was_cooked"),
+                debrief_data.get("what_worked"),
+                debrief_data.get("what_didnt_work"),
+                debrief_data.get("what_was_wasted"),
+                debrief_data.get("notes"),
+            ))
+            await db.commit()
+            return cursor.lastrowid
+
+    async def get_debriefs(self, limit: int = 10) -> List[Dict[str, Any]]:
+        """Get recent debriefs, newest first."""
+        async with aiosqlite.connect(self.db_path) as db:
+            db.row_factory = aiosqlite.Row
+            cursor = await db.execute(
+                "SELECT * FROM debriefs ORDER BY created_at DESC LIMIT ?",
+                (limit,)
+            )
+            rows = await cursor.fetchall()
+            return [dict(row) for row in rows]
 
 
 # Global database instance

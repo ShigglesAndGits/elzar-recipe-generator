@@ -737,6 +737,8 @@ function ToolResultBadge({ result }) {
     copy_and_edit_recipe: '📋',
     get_user_preferences: '👤',
     update_user_preferences: '👤',
+    log_debrief: '📝',
+    get_debriefs: '📊',
   };
 
   const icon = toolIcons[result.tool] || '🔧';

@@ -10,38 +10,19 @@ echo "=============================================="
 mkdir -p /app/data
 chmod 755 /app/data
 
-# Validate required environment variables
-if [ -z "$GROCY_URL" ]; then
-    echo "ERROR: GROCY_URL environment variable is required"
-    exit 1
-fi
-
-if [ -z "$GROCY_API_KEY" ]; then
-    echo "ERROR: GROCY_API_KEY environment variable is required"
-    exit 1
-fi
-
-if [ -z "$LLM_API_URL" ]; then
-    echo "ERROR: LLM_API_URL environment variable is required"
-    exit 1
-fi
-
-if [ -z "$LLM_API_KEY" ]; then
-    echo "ERROR: LLM_API_KEY environment variable is required"
-    exit 1
-fi
-
-if [ -z "$LLM_MODEL" ]; then
-    echo "ERROR: LLM_MODEL environment variable is required"
-    exit 1
+# Validate environment variables
+# Grocy is optional (app works without it per Grocy-free audit)
+# LLM settings can be configured via env vars OR the Settings UI (stored in SQLite)
+if [ -z "$LLM_API_URL" ] && [ -z "$LLM_API_KEY" ] && [ -z "$LLM_MODEL" ]; then
+    echo "NOTE: No LLM env vars set. Configure via Settings UI or provide LLM_API_URL, LLM_API_KEY, LLM_MODEL."
 fi
 
 echo "Configuration:"
-echo "  - Grocy URL: $GROCY_URL"
-echo "  - LLM API: $LLM_API_URL"
-echo "  - LLM Model: $LLM_MODEL"
+echo "  - Grocy URL: ${GROCY_URL:-(not set, configure in Settings)}"
+echo "  - LLM API: ${LLM_API_URL:-(not set, configure in Settings)}"
+echo "  - LLM Model: ${LLM_MODEL:-(not set, configure in Settings)}"
 echo "  - Unit Preference: ${UNIT_PREFERENCE:-imperial}"
-echo "  - Max History: ${MAX_RECIPE_HISTORY:-50}"
+echo "  - Max History: ${MAX_RECIPE_HISTORY:-1000}"
 echo ""
 echo "Starting services..."
 

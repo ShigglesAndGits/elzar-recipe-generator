@@ -416,7 +416,8 @@ async def setup_locations():
     Creates:
     - Pantry
     - Fridge
-    
+    - Freezer
+
     Returns:
         Summary of locations created
     """
@@ -437,7 +438,8 @@ async def setup_locations():
         # Locations to create
         locations_to_create = [
             ("Pantry", "Dry goods and non-perishables"),
-            ("Fridge", "Refrigerated items")
+            ("Fridge", "Refrigerated items"),
+            ("Freezer", "Frozen items and prepped meals")
         ]
         
         for name, description in locations_to_create:

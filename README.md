@@ -46,6 +46,14 @@ Elzar is a self-hosted web application that generates creative recipes based on 
   - **Auto-create**: Automatically create missing products and units
 - **Manual Review**: Edit quantities, units, and product matches before committing
 
+### 🧊 Freezer Dashboard (v2.0)
+- **Live Freezer View**: See everything in your freezer locations at a glance
+- **Age Tracking**: Shows when items were frozen and how long they've been stored
+- **Expiry Alerts**: Color-coded badges for upcoming or past best-before dates
+- **Quick Consume**: One-click "-1" portion or "Use All" buttons
+- **Search**: Filter freezer contents by name
+- **Grocy-Powered**: Reads directly from Grocy's freezer locations — no separate database
+
 ### 🛒 Recipe Integration (v1.1)
 Three powerful buttons on every generated recipe:
 
@@ -422,6 +430,7 @@ tail -f /root/elzar-recipe-generator/frontend.log
 - [x] Household preferences (v2.0)
 - [x] Recipe locking & saving (v2.0)
 - [x] Ideas brainstorm board (v2.0)
+- [x] Freezer inventory dashboard (v2.0)
 
 ### Planned 🚧
 - [ ] Chat interface (AI-powered landing page)

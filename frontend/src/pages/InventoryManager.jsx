@@ -1,5 +1,5 @@
-import React, { useState, useRef } from 'react';
-import { parseInventoryText, purchaseItems, consumeItems, scanPantryImages } from '../api';
+import React, { useState, useRef, useEffect } from 'react';
+import { parseInventoryText, purchaseItems, consumeItems, scanPantryImages, getFreezerStock, consumeFreezerItem } from '../api';
 
 function InventoryManager() {
   const [inputText, setInputText] = useState('');
@@ -13,6 +13,87 @@ function InventoryManager() {
   const [selectedFiles, setSelectedFiles] = useState([]);
   const [previewUrls, setPreviewUrls] = useState([]);
   const fileInputRef = useRef(null);
+
+  // Freezer state
+  const [freezerItems, setFreezerItems] = useState([]);
+  const [freezerLocations, setFreezerLocations] = useState([]);
+  const [freezerLoading, setFreezerLoading] = useState(false);
+  const [freezerError, setFreezerError] = useState(null);
+  const [freezerSearch, setFreezerSearch] = useState('');
+  const [consumingId, setConsumingId] = useState(null);
+
+  // Load freezer stock on mount
+  useEffect(() => {
+    loadFreezerStock();
+  }, []);
+
+  const loadFreezerStock = async () => {
+    setFreezerLoading(true);
+    setFreezerError(null);
+    try {
+      const data = await getFreezerStock();
+      setFreezerItems(data.items || []);
+      setFreezerLocations(data.freezer_locations || []);
+    } catch (err) {
+      // Silently handle if Grocy isn't configured - the section just won't show
+      if (err.response?.status !== 503) {
+        setFreezerError(err.response?.data?.detail || 'Failed to load freezer stock');
+      }
+    } finally {
+      setFreezerLoading(false);
+    }
+  };
+
+  const handleConsumeFreezer = async (item, amount) => {
+    setConsumingId(item.product_id);
+    try {
+      await consumeFreezerItem([{
+        product_id: item.product_id,
+        product_name: item.product_name,
+        amount: amount,
+        unit: item.unit,
+        action: 'consume',
+        location_id: item.location_id,
+      }]);
+      // Reload to get updated quantities
+      await loadFreezerStock();
+    } catch (err) {
+      alert(err.response?.data?.detail || 'Failed to consume from freezer');
+    } finally {
+      setConsumingId(null);
+    }
+  };
+
+  const filteredFreezerItems = freezerItems.filter(item =>
+    item.product_name.toLowerCase().includes(freezerSearch.toLowerCase())
+  );
+
+  const getDaysAgo = (dateStr) => {
+    if (!dateStr) return null;
+    const date = new Date(dateStr);
+    const now = new Date();
+    const diff = Math.floor((now - date) / (1000 * 60 * 60 * 24));
+    return diff;
+  };
+
+  const getFreezerAgeBadge = (dateStr) => {
+    const days = getDaysAgo(dateStr);
+    if (days === null) return null;
+    if (days <= 30) return { label: `${days}d ago`, color: 'text-green-400' };
+    if (days <= 90) return { label: `${Math.floor(days / 7)}w ago`, color: 'text-yellow-400' };
+    return { label: `${Math.floor(days / 30)}mo ago`, color: 'text-orange-400' };
+  };
+
+  const getExpiryBadge = (dateStr) => {
+    if (!dateStr) return null;
+    const date = new Date(dateStr);
+    const now = new Date();
+    const daysUntil = Math.floor((date - now) / (1000 * 60 * 60 * 24));
+    if (daysUntil < 0) return { label: 'Expired', color: 'bg-red-600' };
+    if (daysUntil <= 7) return { label: `${daysUntil}d left`, color: 'bg-orange-600' };
+    if (daysUntil <= 30) return { label: `${Math.floor(daysUntil / 7)}w left`, color: 'bg-yellow-600' };
+    return { label: `${Math.floor(daysUntil / 30)}mo left`, color: 'bg-green-700' };
+  };
 
   const handleFileSelect = (e) => {
     const files = Array.from(e.target.files);
@@ -626,6 +707,145 @@ function InventoryManager() {
           )}
         </div>
       )}
+
+      {/* Freezer Dashboard */}
+      <div className="bg-gray-800 rounded-lg p-6 shadow-lg">
+        <div className="flex justify-between items-center mb-4">
+          <h2 className="text-2xl font-bold flex items-center">
+            <span className="text-3xl mr-2">🧊</span>
+            Freezer
+          </h2>
+          <button
+            onClick={loadFreezerStock}
+            disabled={freezerLoading}
+            className="bg-gray-700 hover:bg-gray-600 text-white text-sm px-3 py-1.5 rounded-lg transition-colors"
+          >
+            {freezerLoading ? '...' : '↻ Refresh'}
+          </button>
+        </div>
+
+        {freezerError && (
+          <div className="bg-red-900 border border-red-700 rounded-lg p-3 text-red-200 text-sm mb-4">
+            {freezerError}
+          </div>
+        )}
+
+        {freezerLocations.length === 0 && !freezerLoading && !freezerError && (
+          <div className="text-center py-8 text-gray-400">
+            <p className="text-4xl mb-3">🧊</p>
+            <p>No freezer location found in Grocy.</p>
+            <p className="text-sm mt-1">Go to Settings → Setup Storage Locations to create one.</p>
+          </div>
+        )}
+
+        {freezerLocations.length > 0 && (
+          <>
+            {/* Search */}
+            {freezerItems.length > 0 && (
+              <input
+                type="text"
+                value={freezerSearch}
+                onChange={(e) => setFreezerSearch(e.target.value)}
+                placeholder="Search freezer..."
+                className="w-full bg-gray-700 border border-gray-600 rounded px-3 py-2 text-sm mb-4 focus:ring-2 focus:ring-cyan-500"
+              />
+            )}
+
+            {/* Summary */}
+            {freezerItems.length > 0 && (
+              <div className="flex gap-4 mb-4 text-sm text-gray-400">
+                <span>{freezerItems.length} item{freezerItems.length !== 1 ? 's' : ''}</span>
+                <span>•</span>
+                <span>{freezerLocations.map(l => l.name).join(', ')}</span>
+              </div>
+            )}
+
+            {/* Empty state */}
+            {!freezerLoading && freezerItems.length === 0 && (
+              <div className="text-center py-8 text-gray-400">
+                <p className="text-4xl mb-3">❄️</p>
+                <p>Freezer is empty</p>
+                <p className="text-sm mt-1">Purchase items to a freezer location in Grocy to see them here</p>
+              </div>
+            )}
+
+            {/* Loading */}
+            {freezerLoading && (
+              <div className="text-center py-8 text-gray-400">Loading freezer stock...</div>
+            )}
+
+            {/* Freezer Items Grid */}
+            {!freezerLoading && filteredFreezerItems.length > 0 && (
+              <div className="space-y-2">
+                {filteredFreezerItems.map((item) => {
+                  const ageBadge = getFreezerAgeBadge(item.earliest_purchased);
+                  const expiryBadge = getExpiryBadge(item.best_before_date);
+
+                  return (
+                    <div
+                      key={item.product_id}
+                      className="bg-gray-700 rounded-lg p-4 flex items-center justify-between hover:bg-gray-650 transition-colors"
+                    >
+                      <div className="flex-1">
+                        <div className="flex items-center gap-2 mb-1">
+                          <h3 className="font-semibold">{item.product_name}</h3>
+                          {expiryBadge && (
+                            <span className={`${expiryBadge.color} text-white text-xs px-2 py-0.5 rounded`}>
+                              {expiryBadge.label}
+                            </span>
+                          )}
+                        </div>
+                        <div className="flex items-center gap-3 text-sm text-gray-400">
+                          <span className="text-white font-medium">
+                            {item.amount} {item.unit}{item.amount !== 1 ? 's' : ''}
+                          </span>
+                          <span className="text-gray-500">•</span>
+                          <span>{item.location_name}</span>
+                          {ageBadge && (
+                            <>
+                              <span className="text-gray-500">•</span>
+                              <span className={ageBadge.color}>Frozen {ageBadge.label}</span>
+                            </>
+                          )}
+                        </div>
+                      </div>
+
+                      {/* Quick consume buttons */}
+                      <div className="flex items-center gap-2 ml-4">
+                        <button
+                          onClick={() => handleConsumeFreezer(item, 1)}
+                          disabled={consumingId === item.product_id || item.amount < 1}
+                          className="bg-cyan-700 hover:bg-cyan-600 disabled:bg-gray-600 text-white text-xs px-3 py-1.5 rounded transition-colors"
+                          title="Use 1 portion"
+                        >
+                          {consumingId === item.product_id ? '...' : '-1'}
+                        </button>
+                        {item.amount > 1 && (
+                          <button
+                            onClick={() => handleConsumeFreezer(item, item.amount)}
+                            disabled={consumingId === item.product_id}
+                            className="bg-orange-700 hover:bg-orange-600 disabled:bg-gray-600 text-white text-xs px-3 py-1.5 rounded transition-colors"
+                            title="Use all"
+                          >
+                            {consumingId === item.product_id ? '...' : 'All'}
+                          </button>
+                        )}
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
+            )}
+
+            {/* No search results */}
+            {!freezerLoading && freezerItems.length > 0 && filteredFreezerItems.length === 0 && (
+              <div className="text-center py-6 text-gray-400">
+                No items match "{freezerSearch}"
+              </div>
+            )}
+          </>
+        )}
+      </div>
     </div>
   );
 }

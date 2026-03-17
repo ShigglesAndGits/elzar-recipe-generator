@@ -642,3 +642,83 @@ async def scan_pantry_images(files: List[UploadFile] = File(...)):
             detail=f"Error scanning images: {str(e)}"
         )
 
+
+@router.get("/freezer")
+async def get_freezer_stock():
+    """
+    Get all items currently stored in freezer locations.
+
+    Returns items aggregated by product with quantities, units,
+    best-before dates, and approximate freeze dates.
+    """
+    await require_grocy_configured()
+    config = await get_effective_config()
+    grocy_client = GrocyClient(config["grocy_url"], config["grocy_api_key"])
+
+    try:
+        return await grocy_client.get_freezer_stock()
+    except Exception as e:
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=f"Error fetching freezer stock: {str(e)}"
+        )
+
+
+@router.post("/freezer/consume")
+async def consume_freezer_item(request: InventoryActionRequest):
+    """
+    Consume items from a freezer location.
+
+    Same as regular consume but passes the freezer location_id
+    so Grocy deducts from the correct location.
+    """
+    await require_grocy_configured()
+    config = await get_effective_config()
+    grocy_client = GrocyClient(config["grocy_url"], config["grocy_api_key"])
+
+    results = {
+        "success": [],
+        "failed": []
+    }
+
+    try:
+        for item in request.items:
+            if item.action != "consume":
+                continue
+
+            try:
+                if not item.product_id:
+                    results["failed"].append({
+                        "product_name": item.product_name,
+                        "reason": "No product ID"
+                    })
+                    continue
+
+                await grocy_client.consume_product(
+                    product_id=item.product_id,
+                    amount=item.amount,
+                    spoiled=False,
+                    location_id=item.location_id
+                )
+
+                results["success"].append({
+                    "product_id": item.product_id,
+                    "product_name": item.product_name,
+                    "quantity": item.amount,
+                    "unit": item.unit
+                })
+
+            except Exception as e:
+                results["failed"].append({
+                    "product_name": item.product_name,
+                    "reason": str(e)
+                })
+
+        return results
+
+    except Exception as e:
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=f"Error consuming freezer items: {str(e)}"
+        )
+

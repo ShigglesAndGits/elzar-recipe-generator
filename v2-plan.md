@@ -98,14 +98,16 @@ services behind them.
 
 ### Phase 2: Inventory & Batch Cooking
 
-**4. Freezer Inventory Tracking** (enhancement #5) — Grocy-only
-- Read/write Grocy's freezer location for prepped meals
-- Dashboard view: meal name, portions remaining, date frozen, cal/portion
-- Log portions from completed prep cook sessions
-- Consume/decrement portions
-- "What's running low" query support
-- UI: Section within Inventory Manager page
-- When Grocy is not configured, this entire section is hidden
+**4. Freezer Inventory Tracking** (enhancement #5) — Grocy-only — COMPLETED
+- Reads Grocy's freezer locations (any location with `is_freezer` flag)
+- Dashboard view within Inventory Manager: product name, quantity, unit, location,
+  freeze age, and best-before expiry with color-coded badges
+- Quick consume: "-1 portion" and "Use All" buttons per item
+- Search/filter freezer contents
+- Setup locations automation now creates Freezer alongside Pantry and Fridge
+- Backend: `get_freezer_stock()` on GrocyClient aggregates stock entries by freezer location,
+  `GET /api/inventory/freezer` and `POST /api/inventory/freezer/consume` endpoints
+- Hidden when Grocy is not configured (section loads silently)
 
 **5. Prep Cook Sessions** (enhancement #2)
 - New DB tables: `prep_cook_sessions`, `prep_cook_recipes`

@@ -120,6 +120,99 @@ class GrocyClient:
         except httpx.HTTPError as e:
             raise Exception(f"Error fetching Grocy inventory: {str(e)}")
     
+    async def get_stock_entries(self) -> List[Dict[str, Any]]:
+        """Get individual stock entries (with location_id per entry)"""
+        async with httpx.AsyncClient() as client:
+            response = await client.get(
+                f"{self.base_url}/api/objects/stock",
+                headers=self.headers,
+                timeout=30.0
+            )
+            response.raise_for_status()
+            return response.json()
+
+    async def get_freezer_stock(self) -> Dict[str, Any]:
+        """
+        Get stock in freezer locations, aggregated by product.
+
+        Returns:
+            Dict with freezer_locations and items (product name, amount,
+            unit, best_before_date, date_frozen)
+        """
+        locations = await self.get_locations()
+        products = await self.get_products()
+        stock_entries = await self.get_stock_entries()
+
+        # Find freezer location IDs
+        freezer_locations = {
+            loc["id"]: loc["name"]
+            for loc in locations
+            if loc.get("is_freezer") == 1 or loc.get("is_freezer") == "1"
+        }
+
+        if not freezer_locations:
+            return {"freezer_locations": [], "items": []}
+
+        # Build product lookup
+        product_lookup = {p["id"]: p for p in products}
+
+        # Get quantity units for display
+        quantity_units = await self.get_quantity_units()
+        qu_lookup = {qu["id"]: qu for qu in quantity_units}
+
+        # Filter stock entries to freezer locations and aggregate by product
+        freezer_items = {}
+        for entry in stock_entries:
+            loc_id = entry.get("location_id")
+            if loc_id not in freezer_locations:
+                continue
+
+            product_id = entry.get("product_id")
+            amount = float(entry.get("amount", 0))
+            if amount <= 0:
+                continue
+
+            if product_id not in freezer_items:
+                product = product_lookup.get(product_id, {})
+                qu_id = product.get("qu_id_stock")
+                qu = qu_lookup.get(qu_id, {})
+                freezer_items[product_id] = {
+                    "product_id": product_id,
+                    "product_name": product.get("name", "Unknown"),
+                    "amount": 0,
+                    "unit": qu.get("name", "unit"),
+                    "location_id": loc_id,
+                    "location_name": freezer_locations[loc_id],
+                    "best_before_date": None,
+                    "earliest_purchased": None,
+                }
+
+            freezer_items[product_id]["amount"] += amount
+
+            # Track earliest best-before date
+            bbd = entry.get("best_before_date")
+            if bbd and bbd != "2999-12-31":
+                current = freezer_items[product_id]["best_before_date"]
+                if current is None or bbd < current:
+                    freezer_items[product_id]["best_before_date"] = bbd
+
+            # Track earliest purchased date (approximation of "date frozen")
+            purchased = entry.get("purchased_date")
+            if purchased:
+                current = freezer_items[product_id]["earliest_purchased"]
+                if current is None or purchased < current:
+                    freezer_items[product_id]["earliest_purchased"] = purchased
+
+        items = sorted(freezer_items.values(), key=lambda x: x["product_name"].lower())
+
+        return {
+            "freezer_locations": [
+                {"id": lid, "name": lname}
+                for lid, lname in freezer_locations.items()
+            ],
+            "items": items
+        }
+
     async def get_locations(self) -> List[Dict[str, Any]]:
         """Get all storage locations from Grocy"""
         async with httpx.AsyncClient() as client:

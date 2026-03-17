@@ -242,6 +242,17 @@ export const addItemsToShoppingList = async (items) => {
   return response.data;
 };
 
+// Freezer Inventory APIs (v2.0)
+export const getFreezerStock = async () => {
+  const response = await api.get('/api/inventory/freezer');
+  return response.data;
+};
+
+export const consumeFreezerItem = async (items) => {
+  const response = await api.post('/api/inventory/freezer/consume', { items });
+  return response.data;
+};
+
 // Recipe Integration APIs (v1.1)
 export const consumeRecipeIngredients = async (recipeId) => {
   const response = await api.post(`/api/recipes/${recipeId}/consume-ingredients`);
